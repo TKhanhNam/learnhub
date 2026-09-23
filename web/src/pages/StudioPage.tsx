@@ -118,8 +118,9 @@ export default function StudioPage() {
 
       {tab === 'content' && selected && (
         <>
+          {/* Phân hệ Quản lý Nội dung: Lâm Thu Thùy (thuy1411) */}
           <p className="muted">Khóa đang soạn: #{selected}</p>
-          <h3>Bài giảng (video / văn bản / slide)</h3>
+          <h3>Bài giảng (video / văn bản / slide) — Studio nội dung</h3>
           <div className="row">
             <input className="grow" value={lectureTitle} onChange={(e) => setLectureTitle(e.target.value)} />
             <button onClick={async () => {

@@ -1,3 +1,4 @@
+// Thùy: API bài giảng / quiz / bài tập trong content-service
 package vn.edu.learnhub.content.controller;
 
 import jakarta.validation.Valid;
