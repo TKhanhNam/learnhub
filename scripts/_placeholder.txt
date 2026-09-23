@@ -1,0 +1,1 @@
+# reusable service pom helper - written by shell

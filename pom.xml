@@ -1,0 +1,29 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!-- path: pom.xml
+     purpose: POM tong hop (aggregator) de build 1 lenh cho tat ca service.
+     Moi service van la 1 project Spring Boot doc lap, mo rieng trong IntelliJ duoc. -->
+<project xmlns="http://maven.apache.org/POM/4.0.0"
+         xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+         xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 https://maven.apache.org/xsd/maven-4.0.0.xsd">
+    <modelVersion>4.0.0</modelVersion>
+
+    <groupId>vn.edu.learnhub</groupId>
+    <artifactId>learnhub</artifactId>
+    <version>1.0.0</version>
+    <packaging>pom</packaging>
+    <name>learnhub</name>
+    <description>LearnHub - san ban khoa hoc online theo kien truc huong dich vu</description>
+
+    <modules>
+        <module>platform-common</module>
+        <module>api-gateway</module>
+        <module>identity-service</module>
+        <module>catalog-service</module>
+        <module>content-service</module>
+        <module>commerce-service</module>
+        <module>learning-service</module>
+        <module>social-service</module>
+        <module>org-service</module>
+        <module>assist-service</module>
+    </modules>
+</project>

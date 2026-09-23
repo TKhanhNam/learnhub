@@ -1,0 +1,13 @@
+target/
+*/target/
+.idea/
+*.iml
+node_modules/
+dist/
+*.log
+.env
+.env.local
+*.tsbuildinfo
+.DS_Store
+mail-outbox/
+identity-service/mail-outbox/

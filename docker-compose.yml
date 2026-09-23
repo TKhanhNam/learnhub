@@ -1,0 +1,235 @@
+# path: docker-compose.yml
+# purpose: chay toan bo LearnHub bang 1 lenh (Buoi 10): ha tang + 8 service + gateway.
+# Frontend van chi biet duy nhat Gateway o cong 8080.
+#
+#   docker compose up -d --build
+#
+# Muon chay nhanh chi ha tang (MySQL/Redis/RabbitMQ/MinIO) roi chay service trong IntelliJ:
+#   docker compose up -d mysql redis rabbitmq minio
+
+services:
+
+  # ----------------------------------------------------------- ha tang
+  mysql:
+    image: mysql:8.4
+    container_name: learnhub-mysql
+    environment:
+      MYSQL_ROOT_PASSWORD: ${DB_PASSWORD:-nam123}
+    ports:
+      - "3307:3306"
+    volumes:
+      - mysql-data:/var/lib/mysql
+      - ./scripts/init-databases.sql:/docker-entrypoint-initdb.d/01-init.sql:ro
+    healthcheck:
+      test: ["CMD", "mysqladmin", "ping", "-h", "localhost", "-p${DB_PASSWORD:-nam123}"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+
+  redis:
+    image: redis:7-alpine
+    container_name: learnhub-redis
+    ports:
+      - "6379:6379"
+
+  rabbitmq:
+    image: rabbitmq:3-management-alpine
+    container_name: learnhub-rabbitmq
+    ports:
+      - "5672:5672"
+      - "15672:15672"
+
+  minio:
+    image: minio/minio:latest
+    container_name: learnhub-minio
+    command: server /data --console-address ":9001"
+    environment:
+      MINIO_ROOT_USER: ${MINIO_USER:-learnhub}
+      MINIO_ROOT_PASSWORD: ${MINIO_PASSWORD:-learnhub123}
+    ports:
+      - "9000:9000"
+      - "9001:9001"
+    volumes:
+      - minio-data:/data
+
+  # ----------------------------------------------------------- service nghiep vu
+  identity-service:
+    build:
+      context: .
+      args:
+        SERVICE: identity-service
+    environment: &service-env
+      DB_HOST: mysql
+      DB_PORT: 3306
+      DB_USER: root
+      DB_PASSWORD: ${DB_PASSWORD:-nam123}
+      JWT_SECRET: ${JWT_SECRET:-LearnHub-Shared-Secret-Key-2026-Doi-Trong-Moi-Truong-That}
+      INTERNAL_KEY: ${INTERNAL_KEY:-learnhub-internal-key-2026}
+    depends_on:
+      mysql:
+        condition: service_healthy
+    ports:
+      - "8081:8081"
+
+  catalog-service:
+    build:
+      context: .
+      args:
+        SERVICE: catalog-service
+    environment: *service-env
+    depends_on:
+      mysql:
+        condition: service_healthy
+    ports:
+      - "8082:8082"
+
+  learning-service:
+    build:
+      context: .
+      args:
+        SERVICE: learning-service
+    environment:
+      DB_HOST: mysql
+      DB_PORT: 3306
+      DB_USER: root
+      DB_PASSWORD: ${DB_PASSWORD:-nam123}
+      JWT_SECRET: ${JWT_SECRET:-LearnHub-Shared-Secret-Key-2026-Doi-Trong-Moi-Truong-That}
+      INTERNAL_KEY: ${INTERNAL_KEY:-learnhub-internal-key-2026}
+      CATALOG_INTERNAL_URL: http://catalog-service:8082
+      CONTENT_INTERNAL_URL: http://content-service:8084
+    depends_on:
+      mysql:
+        condition: service_healthy
+    ports:
+      - "8083:8083"
+
+  content-service:
+    build:
+      context: .
+      args:
+        SERVICE: content-service
+    environment:
+      DB_HOST: mysql
+      DB_PORT: 3306
+      DB_USER: root
+      DB_PASSWORD: ${DB_PASSWORD:-nam123}
+      JWT_SECRET: ${JWT_SECRET:-LearnHub-Shared-Secret-Key-2026-Doi-Trong-Moi-Truong-That}
+      INTERNAL_KEY: ${INTERNAL_KEY:-learnhub-internal-key-2026}
+      CATALOG_INTERNAL_URL: http://catalog-service:8082
+      LEARNING_INTERNAL_URL: http://learning-service:8083
+    depends_on:
+      mysql:
+        condition: service_healthy
+    ports:
+      - "8084:8084"
+
+  commerce-service:
+    build:
+      context: .
+      args:
+        SERVICE: commerce-service
+    environment:
+      DB_HOST: mysql
+      DB_PORT: 3306
+      DB_USER: root
+      DB_PASSWORD: ${DB_PASSWORD:-nam123}
+      JWT_SECRET: ${JWT_SECRET:-LearnHub-Shared-Secret-Key-2026-Doi-Trong-Moi-Truong-That}
+      INTERNAL_KEY: ${INTERNAL_KEY:-learnhub-internal-key-2026}
+      CATALOG_INTERNAL_URL: http://catalog-service:8082
+      LEARNING_INTERNAL_URL: http://learning-service:8083
+    depends_on:
+      mysql:
+        condition: service_healthy
+    ports:
+      - "8085:8085"
+
+  social-service:
+    build:
+      context: .
+      args:
+        SERVICE: social-service
+    environment:
+      DB_HOST: mysql
+      DB_PORT: 3306
+      DB_USER: root
+      DB_PASSWORD: ${DB_PASSWORD:-nam123}
+      JWT_SECRET: ${JWT_SECRET:-LearnHub-Shared-Secret-Key-2026-Doi-Trong-Moi-Truong-That}
+      INTERNAL_KEY: ${INTERNAL_KEY:-learnhub-internal-key-2026}
+      CATALOG_INTERNAL_URL: http://catalog-service:8082
+      LEARNING_INTERNAL_URL: http://learning-service:8083
+      IDENTITY_INTERNAL_URL: http://identity-service:8081
+    depends_on:
+      mysql:
+        condition: service_healthy
+    ports:
+      - "8086:8086"
+
+  org-service:
+    build:
+      context: .
+      args:
+        SERVICE: org-service
+    environment:
+      DB_HOST: mysql
+      DB_PORT: 3306
+      DB_USER: root
+      DB_PASSWORD: ${DB_PASSWORD:-nam123}
+      JWT_SECRET: ${JWT_SECRET:-LearnHub-Shared-Secret-Key-2026-Doi-Trong-Moi-Truong-That}
+      INTERNAL_KEY: ${INTERNAL_KEY:-learnhub-internal-key-2026}
+      CATALOG_INTERNAL_URL: http://catalog-service:8082
+      LEARNING_INTERNAL_URL: http://learning-service:8083
+    depends_on:
+      mysql:
+        condition: service_healthy
+    ports:
+      - "8087:8087"
+
+  assist-service:
+    build:
+      context: .
+      args:
+        SERVICE: assist-service
+    environment:
+      DB_HOST: mysql
+      DB_PORT: 3306
+      DB_USER: root
+      DB_PASSWORD: ${DB_PASSWORD:-nam123}
+      JWT_SECRET: ${JWT_SECRET:-LearnHub-Shared-Secret-Key-2026-Doi-Trong-Moi-Truong-That}
+      INTERNAL_KEY: ${INTERNAL_KEY:-learnhub-internal-key-2026}
+      CATALOG_INTERNAL_URL: http://catalog-service:8082
+    depends_on:
+      mysql:
+        condition: service_healthy
+    ports:
+      - "8088:8088"
+
+  # ----------------------------------------------------------- cong vao duy nhat
+  api-gateway:
+    build:
+      context: .
+      args:
+        SERVICE: api-gateway
+    environment:
+      IDENTITY_URL: http://identity-service:8081
+      CATALOG_URL: http://catalog-service:8082
+      LEARNING_URL: http://learning-service:8083
+      CONTENT_URL: http://content-service:8084
+      COMMERCE_URL: http://commerce-service:8085
+      SOCIAL_URL: http://social-service:8086
+      ORG_URL: http://org-service:8087
+      ASSIST_URL: http://assist-service:8088
+    depends_on:
+      - identity-service
+      - catalog-service
+      - learning-service
+      - content-service
+      - commerce-service
+      - social-service
+      - org-service
+      - assist-service
+    ports:
+      - "8080:8080"
+
+volumes:
+  mysql-data:
+  minio-data:

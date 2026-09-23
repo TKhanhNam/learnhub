@@ -1,0 +1,128 @@
+# path: api-gateway/src/main/resources/application.yml
+# purpose: dinh tuyen toan bo /api/** ve 8 service; CORS CHI cau hinh o day
+# (khong duoc va CORS o tung service - nguyen tac tap trung hoa cua Buoi 4)
+
+server:
+  port: 8080
+
+spring:
+  application:
+    name: api-gateway
+  cloud:
+    gateway:
+      globalcors:
+        corsConfigurations:
+          '[/**]':
+            allowedOrigins:
+              - "http://localhost:5173"
+              - "http://localhost:5174"
+              - "http://127.0.0.1:5173"
+            allowedMethods: [GET, POST, PUT, PATCH, DELETE, OPTIONS]
+            allowedHeaders: ["*"]
+            exposedHeaders: ["X-Trace-Id", "Content-Disposition"]
+            allowCredentials: true
+      routes:
+        # ---------- identity-service ----------
+        - id: identity-auth
+          uri: ${services.identity-url}
+          predicates:
+            - Path=/api/auth/**
+          filters:
+            - RewritePath=/api/auth/(?<seg>.*), /auth/${seg}
+
+        - id: identity-users
+          uri: ${services.identity-url}
+          predicates:
+            - Path=/api/users,/api/users/**
+          filters:
+            - RewritePath=/api/users(?<seg>/?.*), /users${seg}
+
+        # ---------- catalog-service ----------
+        - id: catalog
+          uri: ${services.catalog-url}
+          predicates:
+            - Path=/api/catalog/**
+          filters:
+            - RewritePath=/api/catalog/(?<seg>.*), /catalog/${seg}
+
+        # Cong danh cho doi tac ngoai: bat buoc X-API-KEY (Buoi 10)
+        - id: catalog-partner
+          uri: ${services.catalog-url}
+          predicates:
+            - Path=/api/public/courses
+          filters:
+            - RewritePath=/api/public/courses, /catalog/courses
+
+        # ---------- content-service ----------
+        - id: content
+          uri: ${services.content-url}
+          predicates:
+            - Path=/api/content/**
+          filters:
+            - RewritePath=/api/content/(?<seg>.*), /content/${seg}
+
+        # ---------- commerce-service ----------
+        - id: commerce
+          uri: ${services.commerce-url}
+          predicates:
+            - Path=/api/commerce/**
+          filters:
+            - RewritePath=/api/commerce/(?<seg>.*), /commerce/${seg}
+
+        # ---------- learning-service ----------
+        - id: learning
+          uri: ${services.learning-url}
+          predicates:
+            - Path=/api/learning/**
+          filters:
+            - RewritePath=/api/learning/(?<seg>.*), /learning/${seg}
+
+        # ---------- social-service ----------
+        - id: social
+          uri: ${services.social-url}
+          predicates:
+            - Path=/api/social/**
+          filters:
+            - RewritePath=/api/social/(?<seg>.*), /social/${seg}
+
+        # ---------- org-service ----------
+        - id: org
+          uri: ${services.org-url}
+          predicates:
+            - Path=/api/org/**
+          filters:
+            - RewritePath=/api/org/(?<seg>.*), /org/${seg}
+
+        # ---------- assist-service ----------
+        - id: assist
+          uri: ${services.assist-url}
+          predicates:
+            - Path=/api/assist/**
+          filters:
+            - RewritePath=/api/assist/(?<seg>.*), /assist/${seg}
+
+# Dia chi cac service - chay local thi dung localhost, chay Docker thi truyen bien moi truong
+services:
+  identity-url: ${IDENTITY_URL:http://localhost:8081}
+  catalog-url: ${CATALOG_URL:http://localhost:8082}
+  learning-url: ${LEARNING_URL:http://localhost:8083}
+  content-url: ${CONTENT_URL:http://localhost:8084}
+  commerce-url: ${COMMERCE_URL:http://localhost:8085}
+  social-url: ${SOCIAL_URL:http://localhost:8086}
+  org-url: ${ORG_URL:http://localhost:8087}
+  assist-url: ${ASSIST_URL:http://localhost:8088}
+
+# API Key cho doi tac ngoai (Buoi 10)
+partner:
+  api-key: learnhub-partner-key-2026
+
+# Rate limiting (token bucket). Ban in-memory chay duoc ngay khong can Redis;
+# ban production chuyen sang Redis - xem README muc "Lo trinh production".
+ratelimit:
+  enabled: true
+  capacity: 120
+  refill-per-minute: 120
+
+logging:
+  pattern:
+    console: "%d{HH:mm:ss.SSS} [%thread] %-5level [trace=%X{traceId}] %logger{20} - %msg%n"
