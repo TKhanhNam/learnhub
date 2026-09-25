@@ -29,16 +29,19 @@ public class ContentService {
     private final AssignmentRepository assignmentRepository;
     private final CatalogInternalClient catalogClient;
     private final LearningInternalClient learningClient;
+    private final vn.edu.learnhub.content.notification.ContentNotificationService notificationService;
 
     public ContentService(LectureRepository lectureRepository, QuizRepository quizRepository,
                           QuizQuestionRepository questionRepository, AssignmentRepository assignmentRepository,
-                          CatalogInternalClient catalogClient, LearningInternalClient learningClient) {
+                          CatalogInternalClient catalogClient, LearningInternalClient learningClient,
+                          vn.edu.learnhub.content.notification.ContentNotificationService notificationService) {
         this.lectureRepository = lectureRepository;
         this.quizRepository = quizRepository;
         this.questionRepository = questionRepository;
         this.assignmentRepository = assignmentRepository;
         this.catalogClient = catalogClient;
         this.learningClient = learningClient;
+        this.notificationService = notificationService;
     }
 
     public ContentDtos.CurriculumDTO getCurriculum(Long courseId) {
@@ -59,6 +62,7 @@ public class ContentService {
         l.setCourseId(courseId);
         apply(l, req);
         lectureRepository.save(l);
+        notificationService.notifyNewLecture(courseId, l.getTitle(), l.getType());
         return toLecture(l, true);
     }
 
@@ -100,6 +104,7 @@ public class ContentService {
                 questionRepository.save(item);
             }
         }
+        notificationService.notifyNewQuiz(courseId, quiz.getTitle());
         return toQuiz(quiz, true);
     }
 
@@ -111,6 +116,7 @@ public class ContentService {
         a.setTitle(req.title());
         a.setInstruction(req.instruction());
         assignmentRepository.save(a);
+        notificationService.notifyNewAssignment(courseId, a.getTitle());
         return toAssignment(a);
     }
 

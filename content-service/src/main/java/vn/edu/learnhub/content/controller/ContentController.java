@@ -13,11 +13,14 @@ import vn.edu.learnhub.platform.api.ApiResponse;
 public class ContentController {
     private final ContentService contentService;
     private final vn.edu.learnhub.content.service.MinioStorageService minioStorageService;
+    private final vn.edu.learnhub.content.notification.ContentNotificationService notificationService;
 
     public ContentController(ContentService contentService,
-                             vn.edu.learnhub.content.service.MinioStorageService minioStorageService) {
+                             vn.edu.learnhub.content.service.MinioStorageService minioStorageService,
+                             vn.edu.learnhub.content.notification.ContentNotificationService notificationService) {
         this.contentService = contentService;
         this.minioStorageService = minioStorageService;
+        this.notificationService = notificationService;
     }
 
     @GetMapping("/courses/{courseId}/curriculum")
@@ -69,5 +72,14 @@ public class ContentController {
         String objectName = minioStorageService.uploadFile(file, "courses/" + courseId + "/" + type);
         String url = minioStorageService.getPresignedUrl(objectName);
         return ApiResponse.ok(new ContentDtos.UploadMediaResponse(objectName, url), "Upload len MinIO thanh cong");
+    }
+
+    @GetMapping("/courses/{courseId}/notifications")
+    public ApiResponse<java.util.List<vn.edu.learnhub.content.notification.ContentNotificationService.NotificationItem>> getNotifications(@PathVariable Long courseId) {
+        return ApiResponse.ok(
+                notificationService.getRecentNotifications().stream()
+                        .filter(n -> n.courseId().equals(courseId))
+                        .toList()
+        );
     }
 }
