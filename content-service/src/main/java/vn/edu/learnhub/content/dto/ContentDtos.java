@@ -31,4 +31,5 @@ public final class ContentDtos {
     public record CourseContentStats(Long courseId, int lectureCount, int totalDurationSeconds) {}
     public record AnswerKeyItem(Long questionId, String correctOption) {}
     public record QuizAnswerKey(Long quizId, Long courseId, Integer passScore, List<AnswerKeyItem> questions) {}
+    public record UploadMediaResponse(String objectName, String url) {}
 }

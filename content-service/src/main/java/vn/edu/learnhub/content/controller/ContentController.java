@@ -12,9 +12,12 @@ import vn.edu.learnhub.platform.api.ApiResponse;
 @RequestMapping("/content")
 public class ContentController {
     private final ContentService contentService;
+    private final vn.edu.learnhub.content.service.MinioStorageService minioStorageService;
 
-    public ContentController(ContentService contentService) {
+    public ContentController(ContentService contentService,
+                             vn.edu.learnhub.content.service.MinioStorageService minioStorageService) {
         this.contentService = contentService;
+        this.minioStorageService = minioStorageService;
     }
 
     @GetMapping("/courses/{courseId}/curriculum")
@@ -55,5 +58,16 @@ public class ContentController {
     public ApiResponse<ContentDtos.AssignmentDTO> addAssignment(@PathVariable Long courseId,
                                                                 @Valid @RequestBody ContentDtos.AssignmentRequest req) {
         return ApiResponse.created(contentService.addAssignment(courseId, req), "Da tao bai tap");
+    }
+
+    @PostMapping(value = "/courses/{courseId}/lectures/upload", consumes = org.springframework.http.MediaType.MULTIPART_FORM_DATA_VALUE)
+    @PreAuthorize("hasAnyRole('INSTRUCTOR','ADMIN')")
+    public ApiResponse<ContentDtos.UploadMediaResponse> uploadMedia(
+            @PathVariable Long courseId,
+            @RequestParam("file") org.springframework.web.multipart.MultipartFile file,
+            @RequestParam(value = "type", defaultValue = "video") String type) {
+        String objectName = minioStorageService.uploadFile(file, "courses/" + courseId + "/" + type);
+        String url = minioStorageService.getPresignedUrl(objectName);
+        return ApiResponse.ok(new ContentDtos.UploadMediaResponse(objectName, url), "Upload len MinIO thanh cong");
     }
 }
