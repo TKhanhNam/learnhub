@@ -30,6 +30,13 @@ export default function StudioPage() {
   const [reply, setReply] = useState('')
   const [subs, setSubs] = useState<Submission[]>([])
   const [stats, setStats] = useState<Stats | null>(null)
+  const [lectures, setLectures] = useState<Array<{ id: number; title: string; type: string; durationSeconds: number }>>([])
+
+  const loadLectures = (courseId: number) => {
+    axiosClient.get(`/api/content/courses/${courseId}/curriculum`).then((r) => {
+      setLectures(r.data?.data?.lectures || [])
+    }).catch(() => setLectures([]))
+  }
 
   const load = () => {
     axiosClient.get('/api/catalog/instructor/courses').then((res) => {
@@ -54,6 +61,7 @@ export default function StudioPage() {
 
   useEffect(() => {
     if (!selected) return
+    loadLectures(selected)
     axiosClient.get(`/api/social/reviews?courseId=${selected}`).then((r) => setReviews(r.data.data || [])).catch(() => {})
     axiosClient.get(`/api/learning/instructor/submissions?courseId=${selected}`).then((r) => setSubs(r.data.data || [])).catch(() => setSubs([]))
     axiosClient.get(`/api/learning/instructor/stats?courseIds=${selected}`).then((r) => setStats(r.data.data)).catch(() => {})
@@ -129,12 +137,14 @@ export default function StudioPage() {
                 durationSeconds: 90, downloadUrl: 'https://www.w3.org/WAI/ER/tests/xhtml/testfiles/resources/pdf/dummy.pdf',
               })
               setMsg('Đã thêm bài giảng video + tài liệu tải về')
+              loadLectures(selected)
             }}>+ video</button>
             <button className="ghost" onClick={async () => {
               await axiosClient.post(`/api/content/courses/${selected}/lectures`, {
                 title: lectureTitle, type: 'TEXT', bodyHtml: '<p>Slide / tài liệu tóm tắt.</p>', durationSeconds: 180,
               })
               setMsg('Đã thêm bài văn bản / slide')
+              loadLectures(selected)
             }}>+ slide/text</button>
           </div>
           <div style={{ marginTop: '0.75rem', padding: '0.75rem', borderRadius: '8px', border: '1px solid rgba(255,255,255,0.1)', background: 'rgba(255,255,255,0.03)' }}>
@@ -158,6 +168,7 @@ export default function StudioPage() {
                     durationSeconds: 120,
                   })
                   setMsg(`Đã tải lên MinIO & gửi thông báo bài giảng mới: ${file.name}`)
+                  loadLectures(selected)
                 } catch {
                   setMsg('Upload MinIO hoàn tất (hoặc dùng link mẫu nếu MinIO offline)')
                 }
@@ -165,6 +176,24 @@ export default function StudioPage() {
               <span className="badge" style={{ background: '#0284c7', color: '#fff', padding: '2px 8px', borderRadius: '4px', fontSize: '0.75rem' }}>MinIO Bucket: learnhub-content</span>
             </div>
           </div>
+          {lectures.length > 0 && (
+            <div style={{ marginTop: '0.75rem', border: '1px solid rgba(255,255,255,0.08)', borderRadius: '8px', padding: '0.75rem', background: 'rgba(255,255,255,0.02)' }}>
+              <p style={{ fontSize: '0.85rem', fontWeight: 600, marginBottom: '0.5rem' }}>Danh sách bài giảng ({lectures.length}):</p>
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '0.35rem' }}>
+                {lectures.map((lec, idx) => (
+                  <div key={lec.id} style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '4px 8px', borderRadius: '4px', background: 'rgba(255,255,255,0.02)' }}>
+                    <span style={{ fontSize: '0.85rem' }}>#{idx + 1}. {lec.title} <span className="badge" style={{ fontSize: '0.7rem', marginLeft: '6px' }}>{lec.type}</span></span>
+                    <button className="ghost" style={{ fontSize: '0.75rem', padding: '2px 8px', color: '#f87171' }} onClick={async () => {
+                      if (!confirm(`Xóa bài giảng "${lec.title}"?`)) return
+                      await axiosClient.delete(`/api/content/lectures/${lec.id}`)
+                      setMsg(`Đã xóa bài giảng: ${lec.title}`)
+                      loadLectures(selected)
+                    }}>Xóa</button>
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
           <h3>Quiz / practice test</h3>
           <div className="row">
             <input className="grow" value={quizTitle} onChange={(e) => setQuizTitle(e.target.value)} />
