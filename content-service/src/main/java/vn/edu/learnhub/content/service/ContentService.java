@@ -83,6 +83,26 @@ public class ContentService {
     }
 
     @Transactional
+    public List<ContentDtos.LectureDTO> reorderLectures(Long courseId, List<Long> lectureIds) {
+        assertOwner(courseId);
+        List<Lecture> list = lectureRepository.findByCourseIdOrderBySortOrderAsc(courseId);
+        java.util.Map<Long, Lecture> map = list.stream().collect(
+                java.util.stream.Collectors.toMap(Lecture::getId, java.util.function.Function.identity()));
+        int order = 1;
+        for (Long id : lectureIds) {
+            Lecture lec = map.get(id);
+            if (lec != null) {
+                lec.setSortOrder(order++);
+                lectureRepository.save(lec);
+            }
+        }
+        return list.stream()
+                .sorted(java.util.Comparator.comparingInt(Lecture::getSortOrder))
+                .map(l -> toLecture(l, true))
+                .toList();
+    }
+
+    @Transactional
     public ContentDtos.QuizDTO addQuiz(Long courseId, ContentDtos.QuizRequest req) {
         assertOwner(courseId);
         Quiz quiz = new Quiz();

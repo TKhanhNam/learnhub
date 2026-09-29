@@ -49,6 +49,14 @@ public class ContentController {
         return ApiResponse.ok(null, "Da xoa bai giang");
     }
 
+    @PutMapping("/courses/{courseId}/lectures/reorder")
+    @PreAuthorize("hasAnyRole('INSTRUCTOR','ADMIN')")
+    public ApiResponse<java.util.List<ContentDtos.LectureDTO>> reorderLectures(
+            @PathVariable Long courseId,
+            @jakarta.validation.Valid @RequestBody ContentDtos.ReorderRequest req) {
+        return ApiResponse.ok(contentService.reorderLectures(courseId, req.lectureIds()), "Da cap nhat thu tu bai giang");
+    }
+
     @PostMapping("/courses/{courseId}/quizzes")
     @PreAuthorize("hasAnyRole('INSTRUCTOR','ADMIN')")
     public ApiResponse<ContentDtos.QuizDTO> addQuiz(@PathVariable Long courseId,

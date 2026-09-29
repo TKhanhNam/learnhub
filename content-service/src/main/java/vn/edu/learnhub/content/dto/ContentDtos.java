@@ -32,4 +32,5 @@ public final class ContentDtos {
     public record AnswerKeyItem(Long questionId, String correctOption) {}
     public record QuizAnswerKey(Long quizId, Long courseId, Integer passScore, List<AnswerKeyItem> questions) {}
     public record UploadMediaResponse(String objectName, String url) {}
+    public record ReorderRequest(@NotNull List<Long> lectureIds) {}
 }
