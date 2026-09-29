@@ -129,4 +129,19 @@ class ContentServiceTest {
         assertEquals(2, stats.lectureCount());
         assertEquals(300, stats.totalDurationSeconds());
     }
+
+    @Test
+    @DisplayName("Kiểm tra danh sách bài giảng không rỗng khi truy vấn")
+    void testLectureRepositoryQuery() {
+        Long courseId = 3L;
+        Lecture l = new Lecture();
+        l.setCourseId(courseId);
+        l.setTitle("Bài 1: Kiến trúc hệ thống");
+        l.setSortOrder(1);
+        when(lectureRepository.findByCourseIdOrderBySortOrderAsc(courseId)).thenReturn(List.of(l));
+
+        List<Lecture> list = lectureRepository.findByCourseIdOrderBySortOrderAsc(courseId);
+        assertEquals(1, list.size());
+        assertEquals("Bài 1: Kiến trúc hệ thống", list.get(0).getTitle());
+    }
 }
