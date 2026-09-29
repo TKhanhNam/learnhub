@@ -52,6 +52,14 @@ public class MinioStorageService {
     }
 
     public String uploadFile(MultipartFile file, String folder) {
+        if (file == null || file.isEmpty()) {
+            throw BusinessException.badRequest("Tệp tải lên không được để trống");
+        }
+        long maxSizeBytes = 200L * 1024 * 1024; // Giới hạn 200MB cho video / tài liệu bài giảng
+        if (file.getSize() > maxSizeBytes) {
+            throw BusinessException.badRequest("Dung lượng tệp vượt quá giới hạn cho phép (tối đa 200MB)");
+        }
+
         try {
             String originalName = file.getOriginalFilename() != null ? file.getOriginalFilename() : "file";
             String extension = "";
@@ -73,6 +81,8 @@ public class MinioStorageService {
             }
             log.info("Upload file len MinIO thanh cong: objectName={}", objectName);
             return objectName;
+        } catch (BusinessException be) {
+            throw be;
         } catch (Exception e) {
             log.error("Loi khi upload file len MinIO: {}", e.getMessage(), e);
             throw BusinessException.badRequest("Loi khi upload tep len MinIO: " + e.getMessage());
@@ -92,6 +102,15 @@ public class MinioStorageService {
         } catch (Exception e) {
             log.warn("Khong the tao presigned URL cho object {}: {}", objectName, e.getMessage());
             return "/api/content/media/" + objectName;
+        }
+    }
+
+    public boolean checkHealth() {
+        try {
+            return minioClient.bucketExists(BucketExistsArgs.builder().bucket(bucketName).build());
+        } catch (Exception e) {
+            log.warn("Kiem tra ket noi MinIO that bai: {}", e.getMessage());
+            return false;
         }
     }
 

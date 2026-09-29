@@ -82,4 +82,14 @@ public class ContentController {
                         .toList()
         );
     }
+
+    @GetMapping("/storage/health")
+    public ApiResponse<java.util.Map<String, Object>> storageHealth() {
+        boolean healthy = minioStorageService.checkHealth();
+        return ApiResponse.ok(java.util.Map.of(
+                "bucket", minioStorageService.getBucketName(),
+                "healthy", healthy,
+                "status", healthy ? "CONNECTED" : "DISCONNECTED"
+        ));
+    }
 }
