@@ -22,7 +22,7 @@ export default function AccountPage() {
       setFullName(d.fullName || '')
       setHeadline(d.headline || '')
       setBio(d.bio || '')
-      if (d.language === 'vi' || d.language === 'en') setLocale(d.language)
+      if (d.language === 'vi' || d.language === 'en' || d.language === 'ja') setLocale(d.language)
       setEmail(d.email || '')
     }).catch(() => {})
   }, [])

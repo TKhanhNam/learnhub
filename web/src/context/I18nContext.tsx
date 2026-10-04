@@ -139,9 +139,78 @@ const dict = {
     account: 'Account',
     certs: 'Certificates',
   },
+  ja: {
+    home: 'ホーム',
+    courses: 'コース',
+    cart: 'カート',
+    learning: 'マイラーニング',
+    login: 'ログイン',
+    register: '新規登録',
+    logout: 'ログアウト',
+    help: 'ヘルプ',
+    studio: 'スタジオ',
+    admin: '管理コンソール',
+    adminPortal: '管理コンソール',
+    business: 'ビジネス',
+    search: 'コースを検索',
+    searchToday: '今日は何を学びますか？',
+    browse: '閲覧',
+    allCourses: 'すべてのコース',
+    guided: 'おすすめコース',
+    getLearnHub: 'LearnHubに参加',
+    heroTitle: '一流から学び、自分も一流になる。',
+    heroSubtitle: '今日学びたいことを選んでください。',
+    explore: '学習を始める',
+    bestsellers: '人気',
+    meetBest: '一流の講師に出会う。',
+    goalBiz: 'ビジネスと起業',
+    goalLead: 'リーダーシップとマネジメント',
+    goalCreate: '創造とアート',
+    goalTech: 'テクノロジーとデータ',
+    goalDesign: 'デザインとプロダクト',
+    membershipTitle: 'ひとつのアカウント。ライブラリ全体。',
+    benefit1: '専門家による何千時間もの動画を、生涯所有。',
+    benefit2: 'ウェブで、いつでも、自分のペースで。',
+    benefit3: '目標に合わせたパーソナルAI提案。',
+    benefit4: 'プロフィール用の修了証明書。',
+    allCategories: 'すべてのカテゴリ',
+    find: '検索',
+    addToCart: 'カートに追加',
+    reviews: 'レビュー',
+    students: '受講者',
+    checkout: 'レジ',
+    coupon: 'クーポンコード',
+    gift: 'ギフトとして購入',
+    subtotal: '小計',
+    lifetime: '生涯アクセス',
+    emptyLearning: 'まだコースを購入していません。コース一覧から登録してください。',
+    notFound: 'ページが見つかりません。',
+    backHome: 'ホームへ戻る',
+    paySuccessTitle: '決済が完了しました',
+    paySuccessBody: 'コースがアカウントに追加され、生涯所有できます。',
+    viewPurchased: '購入したコースを見る',
+    overview: 'プラットフォーム概要',
+    overviewHint: 'カタログの実データを3Dで表示。',
+    statCourses: 'コース',
+    statCategories: 'カテゴリ',
+    featured: '注目',
+    seeMore: 'もっと見る',
+    bestSeller: 'ベストセラー',
+    aCourseBy: 'LearnHub講師によるコース',
+    buy: '購入',
+    coursesHero: 'もっと上手くなりたい人のためのオンラインコース',
+    onlineIn: 'コース',
+    newCourses: '新着コース',
+    topRated: '高評価',
+    popularCourses: '人気コース',
+    categories: 'カテゴリ',
+    isNew: '新着',
+    account: 'アカウント',
+    certs: '修了証',
+  },
 }
 
-type Locale = 'vi' | 'en'
+type Locale = 'vi' | 'en' | 'ja'
 
 const I18nContext = createContext<{
   locale: Locale
@@ -153,7 +222,7 @@ export function I18nProvider({ children }: { children: ReactNode }) {
   const [locale, setLocaleState] = useState<Locale>(() => {
     try {
       const saved = localStorage.getItem('lh_locale')
-      if (saved === 'en' || saved === 'vi') return saved
+      if (saved === 'en' || saved === 'vi' || saved === 'ja') return saved
     } catch { /* ignore */ }
     return 'vi'
   })
