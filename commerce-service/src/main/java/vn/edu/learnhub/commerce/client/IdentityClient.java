@@ -16,10 +16,18 @@ public class IdentityClient {
         this.baseUrl = baseUrl;
     }
 
+    public boolean emailVerified(Long userId) {
+        Flag flag = serviceClient.get("identity",
+                baseUrl + "/internal/users/" + userId + "/email-verified", Flag.class);
+        return flag != null && flag.emailVerified();
+    }
+
     public CommerceDtos.PublicUser byEmail(String email) {
         return serviceClient.get("identity",
                 baseUrl + "/internal/users/by-email?email=" + java.net.URLEncoder.encode(email,
                         java.nio.charset.StandardCharsets.UTF_8),
                 CommerceDtos.PublicUser.class);
     }
+
+    private record Flag(boolean emailVerified) {}
 }

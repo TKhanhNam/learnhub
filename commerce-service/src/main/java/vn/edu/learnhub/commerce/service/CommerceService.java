@@ -8,6 +8,7 @@ import org.springframework.transaction.annotation.Transactional;
 import vn.edu.learnhub.commerce.client.CatalogClient;
 import vn.edu.learnhub.commerce.client.IdentityClient;
 import vn.edu.learnhub.commerce.client.LearningClient;
+import vn.edu.learnhub.commerce.client.PaymentClient;
 import vn.edu.learnhub.commerce.dto.CommerceDtos;
 import vn.edu.learnhub.commerce.entity.CartItem;
 import vn.edu.learnhub.commerce.entity.Order;
@@ -36,8 +37,8 @@ public class CommerceService {
     private final CatalogClient catalogClient;
     private final LearningClient learningClient;
     private final IdentityClient identityClient;
+    private final PaymentClient paymentClient;
     private final BigDecimal platformFeePercent;
-    private final BigDecimal aiExtraPercent;
 
     public CommerceService(CartItemRepository cartItemRepository,
                            OrderRepository orderRepository,
@@ -46,8 +47,8 @@ public class CommerceService {
                            CatalogClient catalogClient,
                            LearningClient learningClient,
                            IdentityClient identityClient,
-                           @Value("${commerce.platform-fee-percent:30}") int platformFeePercent,
-                           @Value("${commerce.ai-extra-percent:5}") int aiExtraPercent) {
+                           PaymentClient paymentClient,
+                           @Value("${commerce.platform-fee-percent:30}") int platformFeePercent) {
         this.cartItemRepository = cartItemRepository;
         this.orderRepository = orderRepository;
         this.orderItemRepository = orderItemRepository;
@@ -55,8 +56,8 @@ public class CommerceService {
         this.catalogClient = catalogClient;
         this.learningClient = learningClient;
         this.identityClient = identityClient;
+        this.paymentClient = paymentClient;
         this.platformFeePercent = BigDecimal.valueOf(platformFeePercent);
-        this.aiExtraPercent = BigDecimal.valueOf(aiExtraPercent);
     }
 
     public CommerceDtos.CartDTO getCart(Long userId) {
@@ -95,7 +96,10 @@ public class CommerceService {
     }
 
     @Transactional
-    public CommerceDtos.OrderDTO checkout(Long buyerId, CommerceDtos.CheckoutRequest request) {
+    public CommerceDtos.CheckoutResult checkout(Long buyerId, CommerceDtos.CheckoutRequest request) {
+        if (!identityClient.emailVerified(buyerId)) {
+            throw BusinessException.forbidden("Can xac thuc email truoc khi thanh toan");
+        }
         List<CartItem> cart = cartItemRepository.findByUserIdOrderByCreatedAtDesc(buyerId);
         if (cart.isEmpty()) {
             throw BusinessException.badRequest("Gio hang trong");
@@ -121,12 +125,10 @@ public class CommerceService {
 
         List<CommerceDtos.CourseSnapshot> snapshots = new ArrayList<>();
         BigDecimal subtotal = BigDecimal.ZERO;
-        boolean anyAi = false;
         for (CartItem cartItem : cart) {
             CommerceDtos.CourseSnapshot snap = catalogClient.snapshot(cartItem.getCourseId());
             snapshots.add(snap);
             subtotal = subtotal.add(nvl(snap.price()));
-            anyAi = anyAi || snap.aiAssistEnabled();
         }
 
         BigDecimal discount = BigDecimal.ZERO;
@@ -143,15 +145,14 @@ public class CommerceService {
         }
 
         BigDecimal total = subtotal.subtract(discount);
-        BigDecimal feeRate = platformFeePercent.add(anyAi ? aiExtraPercent : BigDecimal.ZERO);
-        BigDecimal platformFee = total.multiply(feeRate).divide(BigDecimal.valueOf(100), 2, RoundingMode.HALF_UP);
+        BigDecimal platformFee = total.multiply(platformFeePercent).divide(BigDecimal.valueOf(100), 2, RoundingMode.HALF_UP);
         BigDecimal instructorEarn = total.subtract(platformFee);
 
         Order order = new Order();
         order.setBuyerId(buyerId);
         order.setRecipientId(recipientId);
         order.setRecipientEmail(recipientEmail);
-        order.setStatus(Order.PAID);
+        order.setStatus(Order.PENDING);
         order.setCouponCode(couponCode);
         order.setCouponId(couponId);
         order.setSubtotal(subtotal);
@@ -162,37 +163,83 @@ public class CommerceService {
         order.setCreatedAt(Instant.now());
         order = orderRepository.save(order);
 
-        List<OrderItem> savedItems = new ArrayList<>();
+        for (CommerceDtos.CourseSnapshot snap : snapshots) {
+            OrderItem item = new OrderItem();
+            item.setOrderId(order.getId());
+            item.setCourseId(snap.id());
+            item.setInstructorId(snap.instructorId());
+            item.setTitle(snap.title());
+            item.setPrice(nvl(snap.price()));
+            item.setAiAssist(snap.aiAssistEnabled());
+            orderItemRepository.save(item);
+        }
+
+        long amount = total.setScale(0, RoundingMode.HALF_UP).longValue();
+        if (amount <= 0) {
+            fulfill(order, source);
+            return new CommerceDtos.CheckoutResult(toDto(order), null);
+        }
+        String info = "LearnHub #" + order.getId();
+        String payUrl = paymentClient.createMomo(order.getId(), amount, info);
+        return new CommerceDtos.CheckoutResult(toDto(order), payUrl);
+    }
+
+    @Transactional
+    public CommerceDtos.OrderDTO confirmMomo(CommerceDtos.MomoNotice notice) {
+        Order order = orderRepository.findLocked(notice.commerceOrderId())
+                .orElseThrow(() -> BusinessException.notFound("Khong tim thay don hang"));
+        if (Order.PAID.equals(order.getStatus())) {
+            return toDto(order);
+        }
+        if (!Order.PENDING.equals(order.getStatus())) {
+            throw BusinessException.badRequest("Don hang khong cho thanh toan");
+        }
+        long expected = nvl(order.getTotal()).setScale(0, RoundingMode.HALF_UP).longValue();
+        if (notice.amount() == null || notice.amount() != expected) {
+            order.setStatus(Order.FAILED);
+            orderRepository.save(order);
+            throw BusinessException.badRequest("So tien MoMo khong khop don hang");
+        }
+        String source = order.getRecipientEmail() != null || !order.getBuyerId().equals(order.getRecipientId())
+                ? "GIFT" : "PURCHASE";
+        fulfill(order, source);
+        return toDto(order);
+    }
+
+    @Transactional
+    public CommerceDtos.OrderDTO failMomo(CommerceDtos.MomoNotice notice) {
+        Order order = orderRepository.findLocked(notice.commerceOrderId())
+                .orElseThrow(() -> BusinessException.notFound("Khong tim thay don hang"));
+        if (Order.PENDING.equals(order.getStatus())) {
+            order.setStatus(Order.FAILED);
+            orderRepository.save(order);
+        }
+        return toDto(order);
+    }
+
+    private void fulfill(Order order, String source) {
+        List<OrderItem> items = orderItemRepository.findByOrderId(order.getId());
         List<Long> grantedCourseIds = new ArrayList<>();
         try {
-            for (CommerceDtos.CourseSnapshot snap : snapshots) {
-                OrderItem item = new OrderItem();
-                item.setOrderId(order.getId());
-                item.setCourseId(snap.id());
-                item.setInstructorId(snap.instructorId());
-                item.setTitle(snap.title());
-                item.setPrice(nvl(snap.price()));
-                item.setAiAssist(snap.aiAssistEnabled());
-                savedItems.add(orderItemRepository.save(item));
-
-                learningClient.grant(recipientId, snap.id(), source, order.getId());
-                grantedCourseIds.add(snap.id());
-                catalogClient.increaseEnrollment(snap.id());
+            for (OrderItem item : items) {
+                learningClient.grant(order.getRecipientId(), item.getCourseId(), source, order.getId());
+                grantedCourseIds.add(item.getCourseId());
+                catalogClient.increaseEnrollment(item.getCourseId());
             }
-            if (couponId != null) {
-                catalogClient.redeem(couponId);
+            if (order.getCouponId() != null) {
+                catalogClient.redeem(order.getCouponId());
             }
         } catch (RuntimeException ex) {
             for (Long courseId : grantedCourseIds) {
                 try {
-                    learningClient.revoke(recipientId, courseId);
+                    learningClient.revoke(order.getRecipientId(), courseId);
                 } catch (Exception ignored) {
                     // compensate tot nhat co the
                 }
             }
-            if (couponId != null) {
+            if (order.getCouponId() != null) {
                 try {
-                    catalogClient.release(couponId);
+                    catalogClient.release(order.getCouponId());
                 } catch (Exception ignored) {
                     // ignore
                 }
@@ -201,16 +248,14 @@ public class CommerceService {
             orderRepository.save(order);
             throw ex;
         }
-
-        cartItemRepository.deleteByUserId(buyerId);
-
+        order.setStatus(Order.PAID);
+        orderRepository.save(order);
+        cartItemRepository.deleteByUserId(order.getBuyerId());
         OutboxEvent event = new OutboxEvent();
         event.setEventType("ORDER_PAID");
-        event.setPayload("{\"orderId\":" + order.getId() + ",\"recipientId\":" + recipientId + "}");
+        event.setPayload("{\"orderId\":" + order.getId() + ",\"recipientId\":" + order.getRecipientId() + "}");
         event.setPublished(true);
         outboxEventRepository.save(event);
-
-        return toDto(order, savedItems);
     }
 
     public Page<CommerceDtos.OrderDTO> myOrders(Long buyerId, Pageable pageable) {
@@ -330,7 +375,11 @@ public class CommerceService {
     }
 
     public CommerceDtos.InstructorPayoutDTO instructorPayout(Long instructorId) {
-        List<OrderItem> items = orderItemRepository.findByInstructorId(instructorId);
+        List<OrderItem> items = orderItemRepository.findByInstructorId(instructorId).stream()
+                .filter(item -> orderRepository.findById(item.getOrderId())
+                        .map(order -> Order.PAID.equals(order.getStatus()))
+                        .orElse(false))
+                .toList();
         BigDecimal gross = items.stream().map(OrderItem::getPrice).reduce(BigDecimal.ZERO, BigDecimal::add);
         BigDecimal fee = gross.multiply(platformFeePercent).divide(BigDecimal.valueOf(100), 2, RoundingMode.HALF_UP);
         return new CommerceDtos.InstructorPayoutDTO(instructorId, gross, fee, gross.subtract(fee), items.size());

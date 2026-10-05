@@ -46,10 +46,13 @@ public class CommerceController {
     }
 
     @PostMapping("/checkout")
-    public ApiResponse<CommerceDtos.OrderDTO> checkout(@RequestBody(required = false) CommerceDtos.CheckoutRequest request) {
-        return ApiResponse.created(commerceService.checkout(CurrentUser.requireId(),
-                        request == null ? new CommerceDtos.CheckoutRequest(null, false, null, null) : request),
-                "Thanh toan mock thanh cong, da cap quyen hoc tron doi");
+    public ApiResponse<CommerceDtos.CheckoutResult> checkout(@RequestBody(required = false) CommerceDtos.CheckoutRequest request) {
+        CommerceDtos.CheckoutResult result = commerceService.checkout(CurrentUser.requireId(),
+                request == null ? new CommerceDtos.CheckoutRequest(null, false, null, null) : request);
+        String message = result.payUrl() == null
+                ? "Da cap quyen hoc"
+                : "Chuyen sang cong MoMo de thanh toan";
+        return ApiResponse.created(result, message);
     }
 
     @GetMapping("/orders")
