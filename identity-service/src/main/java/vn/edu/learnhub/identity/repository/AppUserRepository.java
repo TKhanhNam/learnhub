@@ -29,4 +29,6 @@ public interface AppUserRepository extends JpaRepository<AppUser, Long> {
     long countByRole(String role);
 
     long countByLocked(boolean locked);
+
+    List<AppUser> findByRole(String role);
 }

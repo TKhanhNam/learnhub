@@ -188,6 +188,10 @@ public class UserService {
         return toDto(user);
     }
 
+    public boolean isEmailVerified(Long id) {
+        return findUser(id).getEmailVerifiedAt() != null;
+    }
+
     private AppUser findUser(Long id) {
         return userRepository.findById(id)
                 .orElseThrow(() -> BusinessException.notFound("Khong tim thay nguoi dung"));
@@ -197,7 +201,8 @@ public class UserService {
         return new UserDtos.UserDTO(user.getId(), user.getUsername(), user.getEmail(),
                 user.getFullName(), user.getRole(), user.isLocked(), user.getLockReason(),
                 user.getLockedAt(), user.getLockedBy(), user.getHeadline(),
-                user.getBio(), user.getAvatarUrl(), user.getLanguage(), user.getCreatedAt());
+                user.getBio(), user.getAvatarUrl(), user.getLanguage(), user.getCreatedAt(),
+                user.getEmailVerifiedAt() != null);
     }
 
     private UserDtos.MailLogDTO toMailDto(EmailOutbox mail) {

@@ -25,7 +25,8 @@ public final class UserDtos {
             String bio,
             String avatarUrl,
             String language,
-            Instant createdAt) {
+            Instant createdAt,
+            boolean emailVerified) {
     }
 
     public record PublicUserDTO(Long id, String fullName, String headline, String avatarUrl, String role) {

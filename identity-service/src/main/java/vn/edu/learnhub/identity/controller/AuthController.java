@@ -15,15 +15,19 @@ import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
+import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 import vn.edu.learnhub.identity.dto.AuthDtos;
 import vn.edu.learnhub.identity.dto.UserDtos;
 import vn.edu.learnhub.identity.service.AuthService;
+import vn.edu.learnhub.identity.service.EmailVerificationService;
 import vn.edu.learnhub.identity.service.UserService;
 import vn.edu.learnhub.platform.api.ApiResponse;
 import vn.edu.learnhub.platform.security.CurrentUser;
 
 import java.time.Duration;
+import java.util.LinkedHashMap;
+import java.util.Map;
 
 @RestController
 @RequestMapping("/auth")
@@ -31,6 +35,7 @@ public class AuthController {
 
     private final AuthService authService;
     private final UserService userService;
+    private final EmailVerificationService emailVerificationService;
 
     @Value("${auth.refresh-cookie-name:learnhub_refresh}")
     private String refreshCookieName;
@@ -38,9 +43,11 @@ public class AuthController {
     @Value("${auth.refresh-cookie-secure:false}")
     private boolean refreshCookieSecure;
 
-    public AuthController(AuthService authService, UserService userService) {
+    public AuthController(AuthService authService, UserService userService,
+                          EmailVerificationService emailVerificationService) {
         this.authService = authService;
         this.userService = userService;
+        this.emailVerificationService = emailVerificationService;
     }
 
     @PostMapping("/register")
@@ -55,9 +62,10 @@ public class AuthController {
 
     @PostMapping("/login")
     public ResponseEntity<ApiResponse<AuthDtos.TokenResponse>> login(
-            @Valid @RequestBody AuthDtos.LoginRequest request) {
+            @Valid @RequestBody AuthDtos.LoginRequest request,
+            HttpServletRequest http) {
 
-        AuthDtos.TokenResponse token = authService.login(request);
+        AuthDtos.TokenResponse token = authService.login(request, clientIp(http));
         return ResponseEntity.ok()
                 .header(HttpHeaders.SET_COOKIE, buildRefreshCookie(token.refreshToken()).toString())
                 .body(ApiResponse.ok(token, "Dang nhap thanh cong"));
@@ -92,6 +100,22 @@ public class AuthController {
                 .body(ApiResponse.ok(null, "Da dang xuat"));
     }
 
+    @GetMapping("/verify-email")
+    public ApiResponse<Void> verifyEmail(@RequestParam(required = false) String token) {
+        emailVerificationService.confirm(token);
+        return ApiResponse.ok(null, "Da xac thuc email");
+    }
+
+    @PostMapping("/resend-verification")
+    public ApiResponse<Map<String, String>> resendVerification() {
+        String devUrl = emailVerificationService.resend(CurrentUser.requireId());
+        Map<String, String> data = new LinkedHashMap<>();
+        if (devUrl != null) {
+            data.put("devVerifyUrl", devUrl);
+        }
+        return ApiResponse.ok(data, "Da gui email xac thuc");
+    }
+
     @GetMapping("/me")
     public ApiResponse<UserDtos.UserDTO> me() {
         return ApiResponse.ok(userService.getById(CurrentUser.requireId()));
@@ -109,6 +133,14 @@ public class AuthController {
             }
         }
         return null;
+    }
+
+    private String clientIp(HttpServletRequest request) {
+        String header = request.getHeader("X-LearnHub-Client-Ip");
+        if (header != null && !header.isBlank() && header.length() <= 64) {
+            return header.trim();
+        }
+        return request.getRemoteAddr();
     }
 
     private ResponseCookie buildRefreshCookie(String refreshToken) {
