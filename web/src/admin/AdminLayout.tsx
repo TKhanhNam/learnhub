@@ -2,15 +2,16 @@ import { NavLink, Outlet, useNavigate } from 'react-router-dom'
 import { useAuth } from '../context/AuthContext'
 import { useI18n } from '../context/I18nContext'
 import axiosClient from '../api/axiosClient'
+import AiChatWidget from '../components/AiChatWidget'
 
 const links = [
   { to: '/admin', end: true, vi: 'Tổng quan', en: 'Overview' },
   { to: '/admin/courses', vi: 'Khóa học', en: 'Courses' },
   { to: '/admin/users', vi: 'Tài khoản', en: 'Accounts' },
+  { to: '/admin/security', vi: 'Bảo mật', en: 'Security' },
   { to: '/admin/revenue', vi: 'Doanh thu', en: 'Revenue' },
   { to: '/admin/analytics', vi: 'Phân tích', en: 'Analytics' },
   { to: '/admin/coupons', vi: 'Coupon sàn', en: 'Coupons' },
-  { to: '/admin/ai', vi: 'Phí AI', en: 'AI fee' },
   { to: '/admin/business', vi: 'Gói Business', en: 'Business' },
   { to: '/admin/reports', vi: 'Báo cáo Excel', en: 'Excel reports' },
 ]
@@ -57,6 +58,7 @@ export default function AdminLayout() {
           <Outlet />
         </div>
       </div>
+      <AiChatWidget mode="admin" />
     </div>
   )
 }

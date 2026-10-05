@@ -108,7 +108,7 @@ export default function CourseDetailPage() {
       <p>{course.description}</p>
       <p>{course.enrollmentCount} {t('students')} · {Number(course.ratingAvg || 0).toFixed(1)}/5 ({course.ratingCount || 0})</p>
       {course.skills?.length ? <p className="muted">{vi ? 'Kỹ năng:' : 'Skills:'} {course.skills.join(', ')}</p> : null}
-      {course.aiAssistEnabled && <p className="muted">{vi ? 'Khóa này bật trợ lý AI (sàn đớp thêm % trên phần giảng viên).' : 'AI assistant is on (platform takes an extra %).'}</p>}
+      {course.aiAssistEnabled && <p className="muted">{vi ? 'Khóa này có trợ lý AI.' : 'This course includes the AI assistant.'}</p>}
       <p className="price">{Number(course.price).toLocaleString('vi-VN')} ₫ · {t('lifetime')}</p>
       <div className="row">
         {owned ? (

@@ -9,6 +9,8 @@ import RegisterPage from './pages/RegisterPage'
 import CoursesPage from './pages/CoursesPage'
 import CourseDetailPage from './pages/CourseDetailPage'
 import CartPage from './pages/CartPage'
+import VerifyEmailPage from './pages/VerifyEmailPage'
+import PaymentResultPage from './pages/PaymentResultPage'
 import LearningPage from './pages/LearningPage'
 import PlayerPage from './pages/PlayerPage'
 import StudioPage from './pages/StudioPage'
@@ -22,13 +24,14 @@ import AdminUsersPage from './admin/AdminUsersPage'
 import AdminRevenuePage from './admin/AdminRevenuePage'
 import AdminAnalyticsPage from './admin/AdminAnalyticsPage'
 import AdminReportsPage from './admin/AdminReportsPage'
+import AdminSecurityPage from './admin/AdminSecurityPage'
 import AccountPage from './pages/AccountPage'
 import CertificatesPage from './pages/CertificatesPage'
-import AdminAiPage from './admin/AdminAiPage'
 import AdminCouponsPage from './admin/AdminCouponsPage'
 import AdminBusinessPage from './admin/AdminBusinessPage'
 import { useI18n } from './context/I18nContext'
 import { useAuth } from './context/AuthContext'
+import AiChatWidget from './components/AiChatWidget'
 
 function NotFound() {
   const { t } = useI18n()
@@ -57,6 +60,8 @@ export default function App() {
           <Route path="/courses/:slug" element={<CourseDetailPage />} />
           <Route path="/help" element={<HelpPage />} />
           <Route path="/business" element={<BusinessPage />} />
+          <Route path="/verify-email" element={<VerifyEmailPage />} />
+          <Route path="/payment/result" element={<PaymentResultPage />} />
           <Route path="/cart" element={<ProtectedRoute><CartPage /></ProtectedRoute>} />
           <Route path="/learning" element={<ProtectedRoute><LearningPage /></ProtectedRoute>} />
           <Route path="/certificates" element={<ProtectedRoute><CertificatesPage /></ProtectedRoute>} />
@@ -68,10 +73,11 @@ export default function App() {
             <Route index element={<AdminDashboardPage />} />
             <Route path="courses" element={<AdminCoursesPage />} />
             <Route path="users" element={<AdminUsersPage />} />
+            <Route path="security" element={<AdminSecurityPage />} />
             <Route path="revenue" element={<AdminRevenuePage />} />
             <Route path="analytics" element={<AdminAnalyticsPage />} />
             <Route path="coupons" element={<AdminCouponsPage />} />
-            <Route path="ai" element={<AdminAiPage />} />
+            <Route path="ai" element={<Navigate to="/admin" replace />} />
             <Route path="business" element={<AdminBusinessPage />} />
             <Route path="reports" element={<AdminReportsPage />} />
           </Route>
@@ -79,6 +85,7 @@ export default function App() {
         </Routes>
       </div>
       {!isAdminApp && <Footer />}
+      {!isAdminApp && <AiChatWidget />}
     </>
   )
 }

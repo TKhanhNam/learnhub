@@ -189,8 +189,7 @@ export default function CourseBookshelf() {
   return (
     <section className="course-shelf">
       <div className="course-shelf-head">
-        <p className="hero-kicker">Thư viện 3D · Top {HOT_COURSE_LIMIT} truy cập nhiều nhất</p>
-        <h2>Mỗi khóa học là một quyển sách</h2>
+        <h2>Top {HOT_COURSE_LIMIT} khóa học được truy cập nhiều nhất</h2>
       </div>
 
       <div className="shader-frame course-shelf-frame">

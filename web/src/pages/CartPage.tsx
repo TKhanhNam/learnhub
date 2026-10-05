@@ -192,7 +192,12 @@ export default function CartPage() {
         gift,
         recipientEmail: gift ? email : null,
       })
-      const order = res.data.data
+      const data = res.data.data
+      if (data?.payUrl) {
+        window.location.assign(data.payUrl)
+        return
+      }
+      const order = data?.order ?? data
       setPaid({
         id: Number(order?.id ?? 0),
         items: (order?.items || []).map((item: { title: string; price: number }) => ({
@@ -324,8 +329,19 @@ export default function CartPage() {
                 </dl>
 
                 <button className="cart-pay" onClick={checkout} disabled={items.length === 0 || busy}>
-                  {busy ? (vi ? 'Đang xử lý…' : 'Processing…') : `${t('checkout')} · ${vnd(total)}`}
+                  {busy
+                    ? (vi ? 'Đang xử lý…' : 'Processing…')
+                    : items.length > 0 && Number(total) <= 0
+                      ? (vi ? 'Nhận khóa miễn phí' : 'Get free course')
+                      : items.length > 0
+                        ? (vi ? `Thanh toán MoMo · ${vnd(total)}` : `Pay with MoMo · ${vnd(total)}`)
+                        : (vi ? 'Thanh toán MoMo' : 'Pay with MoMo')}
                 </button>
+                {items.length > 0 && Number(total) > 0 && (
+                  <p className="cart-momo-note">{vi
+                    ? 'Cổng MoMo · không lưu thẻ trên LearnHub. Email phải được xác thực trước.'
+                    : 'MoMo checkout. Card data stays with MoMo. Verify your email first.'}</p>
+                )}
                 {msg && <p className="err">{msg}</p>}
               </>
             )}
