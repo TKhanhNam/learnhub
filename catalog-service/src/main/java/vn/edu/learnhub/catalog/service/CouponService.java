@@ -18,6 +18,7 @@ import vn.edu.learnhub.platform.security.CurrentUser;
 import java.time.Instant;
 import java.time.temporal.ChronoUnit;
 import java.util.List;
+import java.util.Locale;
 
 @Service
 public class CouponService {
@@ -96,7 +97,8 @@ public class CouponService {
             return new CatalogDtos.CouponCheckResponse(false, null, 0, "Chua nhap ma giam gia");
         }
 
-        Coupon coupon = couponRepository.findByCodeIgnoreCase(code.trim()).orElse(null);
+        String normalized = code.trim().toUpperCase(Locale.ROOT);
+        Coupon coupon = couponRepository.findByCodeIgnoreCase(normalized).orElse(null);
         if (coupon == null) {
             return new CatalogDtos.CouponCheckResponse(false, null, 0, "Ma giam gia khong ton tai");
         }
