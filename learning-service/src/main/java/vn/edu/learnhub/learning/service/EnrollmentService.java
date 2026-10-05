@@ -307,6 +307,13 @@ public class EnrollmentService {
         return new LearningDtos.InstructorStatsDTO(total, completed, average == null ? 0 : average);
     }
 
+    public LearningDtos.InstructorStatsDTO platformStats() {
+        long total = enrollmentRepository.count();
+        long completed = enrollmentRepository.countAllCompleted();
+        Double average = enrollmentRepository.averageProgressAll();
+        return new LearningDtos.InstructorStatsDTO(total, completed, average == null ? 0 : average);
+    }
+
     public long countByCourse(Long courseId) {
         return enrollmentRepository.countByCourseId(courseId);
     }
