@@ -12,6 +12,8 @@ export default function RegisterPage() {
   const [password, setPassword] = useState('')
   const [role, setRole] = useState('STUDENT')
   const [error, setError] = useState<string | null>(null)
+  const [verifyUrl, setVerifyUrl] = useState<string | null>(null)
+  const [pendingVerify, setPendingVerify] = useState(false)
   const [busy, setBusy] = useState(false)
   const { login } = useAuth()
   const { t, locale } = useI18n()
@@ -24,6 +26,11 @@ export default function RegisterPage() {
     try {
       const res = await axiosClient.post('/api/auth/register', { username, email, fullName, password, role })
       login(res.data.data)
+      if (res.data.data?.emailVerified === false) {
+        setPendingVerify(true)
+        setVerifyUrl(res.data.data.devVerifyUrl || null)
+        return
+      }
       navigate('/')
     } catch (err) {
       setError(axios.isAxiosError(err)
@@ -51,6 +58,16 @@ export default function RegisterPage() {
         <option value="INSTRUCTOR">{locale === 'vi' ? 'Giảng viên' : 'Instructor'}</option>
       </select>
       {error && <p className="err">{error}</p>}
+      {pendingVerify && (
+        <p className="muted">
+          {locale === 'vi'
+            ? 'Hãy xác thực email trước khi thanh toán. '
+            : 'Verify your email before checkout. '}
+          {verifyUrl
+            ? <a href={verifyUrl}>{locale === 'vi' ? 'Mở liên kết xác thực' : 'Open verification link'}</a>
+            : (locale === 'vi' ? 'Kiểm tra hộp thư.' : 'Check your inbox.')}
+        </p>
+      )}
       <div style={{ marginTop: 16 }}>
         <button type="submit" disabled={busy} style={{ width: '100%' }}>{t('register')}</button>
       </div>

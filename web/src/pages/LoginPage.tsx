@@ -8,6 +8,7 @@ import { useI18n } from '../context/I18nContext'
 export default function LoginPage() {
   const [username, setUsername] = useState('')
   const [password, setPassword] = useState('')
+  const [human, setHuman] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [busy, setBusy] = useState(false)
   const { login } = useAuth()
@@ -18,8 +19,13 @@ export default function LoginPage() {
     e.preventDefault()
     setBusy(true)
     setError(null)
+    if (!human) {
+      setError(locale === 'vi' ? 'Hãy tích Tôi là người trước khi đăng nhập.' : 'Confirm you are human before signing in.')
+      setBusy(false)
+      return
+    }
     try {
-      const res = await axiosClient.post('/api/auth/login', { username, password })
+      const res = await axiosClient.post('/api/auth/login', { username, password, human: true })
       login(res.data.data)
       navigate(res.data.data?.role === 'ADMIN' ? '/admin' : '/')
     } catch (err) {
@@ -38,9 +44,13 @@ export default function LoginPage() {
       <input value={username} onChange={(e) => setUsername(e.target.value)} />
       <label>{locale === 'vi' ? 'Mật khẩu' : 'Password'}</label>
       <input type="password" value={password} onChange={(e) => setPassword(e.target.value)} />
+      <label className="human-check">
+        <input type="checkbox" checked={human} onChange={(e) => setHuman(e.target.checked)} />
+        <span>{locale === 'vi' ? 'Tôi là người' : 'I am human'}</span>
+      </label>
       {error && <p className="err">{error}</p>}
       <div style={{ marginTop: 16 }}>
-        <button type="submit" disabled={busy} style={{ width: '100%' }}>{busy ? '...' : t('login')}</button>
+        <button type="submit" disabled={busy || !human} style={{ width: '100%' }}>{busy ? '...' : t('login')}</button>
       </div>
       <p className="muted">
         {locale === 'vi' ? 'Chưa có tài khoản?' : 'No account yet?'} <Link to="/register">{t('register')}</Link>

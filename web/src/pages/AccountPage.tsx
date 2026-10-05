@@ -15,6 +15,8 @@ export default function AccountPage() {
   const [newPassword, setNewPassword] = useState('')
   const [msg, setMsg] = useState<string | null>(null)
   const [email, setEmail] = useState('')
+  const [emailVerified, setEmailVerified] = useState(true)
+  const [verifyUrl, setVerifyUrl] = useState<string | null>(null)
 
   useEffect(() => {
     axiosClient.get('/api/users/me').then((res) => {
@@ -22,8 +24,9 @@ export default function AccountPage() {
       setFullName(d.fullName || '')
       setHeadline(d.headline || '')
       setBio(d.bio || '')
-      if (d.language === 'vi' || d.language === 'en' || d.language === 'ja') setLocale(d.language)
+      if (d.language === 'vi' || d.language === 'en') setLocale(d.language)
       setEmail(d.email || '')
+      setEmailVerified(d.emailVerified !== false)
     }).catch(() => {})
   }, [])
 
@@ -68,6 +71,22 @@ export default function AccountPage() {
     <div className="page">
       <h1>Tài khoản</h1>
       <p className="muted">{email} · {user?.username} · {user?.role}</p>
+      {!emailVerified && (
+        <p className="err">
+          {vi ? 'Email chưa xác thực nên chưa thanh toán được. ' : 'Verify your email before checkout. '}
+          <button type="button" className="ghost" onClick={async () => {
+            try {
+              const res = await axiosClient.post('/api/auth/resend-verification')
+              setVerifyUrl(res.data.data?.devVerifyUrl || null)
+              setMsg(res.data.message || (vi ? 'Đã gửi lại email xác thực.' : 'Verification email sent.'))
+            } catch (err: unknown) {
+              const ax = err as { response?: { data?: { message?: string } } }
+              setMsg(ax.response?.data?.message || (vi ? 'Không gửi lại được.' : 'Could not resend.'))
+            }
+          }}>{vi ? 'Gửi lại liên kết' : 'Resend link'}</button>
+          {verifyUrl && <> <a href={verifyUrl}>{vi ? 'Mở liên kết' : 'Open link'}</a></>}
+        </p>
+      )}
       <form onSubmit={save} className="stack" style={{ maxWidth: 520 }}>
         <label>Họ tên</label>
         <input value={fullName} onChange={(e) => setFullName(e.target.value)} required />

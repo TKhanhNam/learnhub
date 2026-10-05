@@ -38,7 +38,7 @@ export default function AdminDashboardPage() {
           <small>{vi ? 'Cổng quản trị LearnHub' : 'LearnHub admin console'}</small>
         </div>
       </div>
-      <p className="muted">{vi ? 'Đây là cổng riêng của quản trị viên — không dùng giao diện học viên.' : 'This console is separate from the learner website.'}</p>
+      <p className="muted">{vi ? 'Theo dõi tài khoản, khóa học và doanh thu của LearnHub.' : 'Track LearnHub accounts, courses, and revenue.'}</p>
       <div className="admin-kpis">
         {cards.map((c) => (
           <article key={c.label} className="admin-kpi">
@@ -51,7 +51,7 @@ export default function AdminDashboardPage() {
       <div className="admin-kpis" style={{ marginTop: 16 }}>
         <Link className="admin-kpi" to="/admin/users"><strong>{vi ? 'Quản lý tài khoản' : 'Manage accounts'}</strong><small>{vi ? 'Khóa / mở khóa, gửi email lý do' : 'Lock, unlock, email the reason'}</small></Link>
         <Link className="admin-kpi" to="/admin/courses"><strong>{vi ? 'Quản lý khóa học' : 'Manage courses'}</strong><small>{vi ? 'Duyệt, sửa, ẩn, xóa' : 'Approve, edit, hide, delete'}</small></Link>
-        <Link className="admin-kpi" to="/admin/reports"><strong>{vi ? 'Xuất Excel' : 'Export Excel'}</strong><small>{vi ? 'Tài khoản, khóa học, doanh thu' : 'Users, courses, revenue'}</small></Link>
+        <Link className="admin-kpi" to="/admin/security"><strong>{vi ? 'Bảo mật' : 'Security'}</strong><small>{vi ? 'Cảnh báo tấn công và chặn tài khoản' : 'Attack alerts and account blocks'}</small></Link>
       </div>
     </div>
   )
