@@ -12,3 +12,4 @@ payment-service/src/main/resources/payment-secrets.properties
 .DS_Store
 mail-outbox/
 identity-service/mail-outbox/
+assist-service/src/main/resources/assist-secrets.properties
