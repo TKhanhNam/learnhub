@@ -23,6 +23,11 @@ public class SocialController {
         return ApiResponse.ok(socialService.listReviews(courseId));
     }
 
+    @GetMapping("/reviews/summary")
+    public ApiResponse<SocialDtos.CourseRatingSummary> reviewSummary(@RequestParam Long courseId) {
+        return ApiResponse.ok(socialService.courseRatingSummary(courseId));
+    }
+
     @PostMapping("/reviews")
     public ApiResponse<SocialDtos.ReviewDTO> addReview(@Valid @RequestBody SocialDtos.ReviewRequest request) {
         return ApiResponse.created(socialService.addReview(CurrentUser.requireId(), request), "Da gui danh gia");
