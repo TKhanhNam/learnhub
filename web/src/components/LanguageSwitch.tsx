@@ -4,7 +4,7 @@ export default function LanguageSwitch() {
   const { locale, setLocale } = useI18n()
   const vi = locale === 'vi'
   return (
-    <div className="lang-switch" role="group" aria-label={vi ? 'Ngôn ngữ' : locale === 'ja' ? '言語' : 'Language'}>
+    <div className="lang-switch" role="group" aria-label={vi ? 'Ngôn ngữ' : 'Language'}>
       <span className="lang-globe" aria-hidden="true">
         <svg width="16" height="16" viewBox="0 0 24 24" fill="none">
           <circle cx="12" cy="12" r="9" stroke="currentColor" strokeWidth="1.8" />
@@ -13,7 +13,6 @@ export default function LanguageSwitch() {
       </span>
       <button type="button" className={locale === 'vi' ? 'on' : ''} onClick={() => setLocale('vi')}>VI</button>
       <button type="button" className={locale === 'en' ? 'on' : ''} onClick={() => setLocale('en')}>EN</button>
-      <button type="button" className={locale === 'ja' ? 'on' : ''} onClick={() => setLocale('ja')}>JA</button>
     </div>
   )
 }

@@ -34,7 +34,8 @@ axiosClient.interceptors.response.use(
   async (error) => {
     const status = error.response?.status
     const original = error.config
-    if (status === 401 && original && !original._retry && !String(original.url || '').includes('/auth/')) {
+    const url = String(original?.url || '')
+    if (status === 401 && original && !original._retry && !url.includes('/auth/') && !url.includes('/assist/guest-chat')) {
       original._retry = true
       const refreshToken = localStorage.getItem('lh_refresh')
       try {
