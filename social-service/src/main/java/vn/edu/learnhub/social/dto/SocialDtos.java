@@ -22,4 +22,5 @@ public final class SocialDtos {
     public record AccessDTO(boolean hasAccess, Long enrollmentId, Integer progressPercent) {}
     public record PublicUser(Long id, String fullName, String headline, String avatarUrl, String role) {}
     public record RatingUpdate(BigDecimal ratingAvg, Integer ratingCount) {}
+    public record CourseRatingSummary(long reviewCount, double averageRating) {}
 }

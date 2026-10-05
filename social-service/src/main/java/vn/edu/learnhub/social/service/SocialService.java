@@ -49,6 +49,13 @@ public class SocialService {
         this.identityUrl = identityUrl;
     }
 
+    public SocialDtos.CourseRatingSummary courseRatingSummary(Long courseId) {
+        long count = reviewRepository.countByCourseId(courseId);
+        Double average = reviewRepository.averageRating(courseId);
+        double value = average == null ? 0 : average;
+        return new SocialDtos.CourseRatingSummary(count, Math.round(value * 100.0) / 100.0);
+    }
+
     public List<SocialDtos.ReviewDTO> listReviews(Long courseId) {
         List<Review> reviews = reviewRepository.findByCourseIdOrderByCreatedAtDesc(courseId);
         Map<Long, String> names = names(reviews.stream().map(Review::getUserId).toList());
