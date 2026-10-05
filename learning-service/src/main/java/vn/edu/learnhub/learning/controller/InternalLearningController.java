@@ -46,6 +46,11 @@ public class InternalLearningController {
         return enrollmentService.statsForCourses(courseIds);
     }
 
+    @GetMapping("/platform-stats")
+    public LearningDtos.InstructorStatsDTO platformStats() {
+        return enrollmentService.platformStats();
+    }
+
     @GetMapping("/stats/course/{courseId}/count")
     public long count(@PathVariable Long courseId) {
         return enrollmentService.countByCourse(courseId);
