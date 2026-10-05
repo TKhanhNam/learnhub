@@ -9,6 +9,7 @@ import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageImpl;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Pageable;
+import org.springframework.data.domain.Sort;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import vn.edu.learnhub.catalog.dto.CatalogDtos;
@@ -170,7 +171,10 @@ public class CatalogService {
     }
 
     public Page<CatalogDtos.CourseSummaryDTO> getMyCourses(Long instructorId, Pageable pageable) {
-        return courseRepository.findByInstructorId(instructorId, pageable).map(this::toSummary);
+        Pageable sorted = pageable.getSort().isSorted()
+                ? pageable
+                : PageRequest.of(pageable.getPageNumber(), pageable.getPageSize(), Sort.by(Sort.Direction.DESC, "id"));
+        return courseRepository.findByInstructorId(instructorId, sorted).map(this::toSummary);
     }
 
     public Page<CatalogDtos.CourseSummaryDTO> getByStatus(String status, String keyword, Pageable pageable) {
@@ -368,8 +372,9 @@ public class CatalogService {
 
     private void applyRequest(Course course, CatalogDtos.CourseRequest request) {
         course.setTitle(request.title().trim());
-        course.setSubtitle(request.subtitle());
-        course.setDescription(request.description());
+        course.setSubtitle(request.subtitle() == null ? "" : request.subtitle().trim());
+        String description = request.description();
+        course.setDescription(description == null ? "" : description.trim());
         course.setCategoryId(request.categoryId());
         course.setPrice(request.price());
         if (request.level() != null && !request.level().isBlank()) {
