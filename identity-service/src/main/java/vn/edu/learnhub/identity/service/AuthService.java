@@ -29,15 +29,21 @@ public class AuthService {
     private final RefreshTokenRepository refreshTokenRepository;
     private final PasswordEncoder passwordEncoder;
     private final JwtService jwtService;
+    private final EmailVerificationService emailVerificationService;
+    private final SecurityGuard securityGuard;
 
     public AuthService(AppUserRepository userRepository,
                        RefreshTokenRepository refreshTokenRepository,
                        PasswordEncoder passwordEncoder,
-                       JwtService jwtService) {
+                       JwtService jwtService,
+                       EmailVerificationService emailVerificationService,
+                       SecurityGuard securityGuard) {
         this.userRepository = userRepository;
         this.refreshTokenRepository = refreshTokenRepository;
         this.passwordEncoder = passwordEncoder;
         this.jwtService = jwtService;
+        this.emailVerificationService = emailVerificationService;
+        this.securityGuard = securityGuard;
     }
 
     @Transactional
@@ -65,21 +71,27 @@ public class AuthService {
         user.setCreatedAt(Instant.now());
 
         userRepository.save(user);
-        return issueTokens(user);
+        String devVerifyUrl = emailVerificationService.issue(user);
+        return issueTokens(user, devVerifyUrl);
     }
 
     @Transactional
-    public AuthDtos.TokenResponse login(AuthDtos.LoginRequest request) {
+    public AuthDtos.TokenResponse login(AuthDtos.LoginRequest request, String clientIp) {
+        if (!Boolean.TRUE.equals(request.human())) {
+            securityGuard.humanRejected(request.username(), clientIp);
+            throw BusinessException.badRequest("Hay xac nhan ban la nguoi truoc khi dang nhap");
+        }
         String login = request.username().trim();
         AppUser user = userRepository.findByUsername(login)
                 .or(() -> userRepository.findByEmailIgnoreCase(login))
-                // Thong bao chung chung: khong tiet lo "username khong ton tai" de tranh do tai khoan
-                .orElseThrow(() -> BusinessException.unauthorized("Sai tai khoan hoac mat khau"));
+                .orElse(null);
 
-        if (!passwordEncoder.matches(request.password(), user.getPasswordHash())) {
+        if (user == null || !passwordEncoder.matches(request.password(), user.getPasswordHash())) {
+            securityGuard.loginFailed(login, clientIp);
             throw BusinessException.unauthorized("Sai tai khoan hoac mat khau");
         }
         if (user.isLocked()) {
+            securityGuard.loginFailed(login, clientIp);
             String reason = user.getLockReason();
             String detail = (reason == null || reason.isBlank())
                     ? "Tai khoan da bi khoa, vui long lien he ho tro"
@@ -87,7 +99,7 @@ public class AuthService {
             throw BusinessException.forbidden(detail);
         }
 
-        return issueTokens(user);
+        return issueTokens(user, null);
     }
 
     /**
@@ -133,7 +145,7 @@ public class AuthService {
         stored.setRevoked(true);
         refreshTokenRepository.save(stored);
 
-        return issueTokens(user);
+        return issueTokens(user, null);
     }
 
     @Transactional
@@ -158,7 +170,7 @@ public class AuthService {
         refreshTokenRepository.revokeAllByUserId(userId);
     }
 
-    private AuthDtos.TokenResponse issueTokens(AppUser user) {
+    private AuthDtos.TokenResponse issueTokens(AppUser user, String devVerifyUrl) {
         String accessToken = jwtService.generateAccessToken(user.getId(), user.getUsername(), user.getRole());
 
         String jti = JwtService.newJti();
@@ -173,7 +185,8 @@ public class AuthService {
 
         return new AuthDtos.TokenResponse(
                 user.getId(), user.getUsername(), user.getFullName(), user.getRole(),
-                accessToken, refreshToken, jwtService.getAccessExpirationMs());
+                accessToken, refreshToken, jwtService.getAccessExpirationMs(),
+                user.getEmailVerifiedAt() != null, devVerifyUrl);
     }
 
     private String sha256(String raw) {

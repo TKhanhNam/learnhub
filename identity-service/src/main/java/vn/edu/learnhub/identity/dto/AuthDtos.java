@@ -38,7 +38,8 @@ public final class AuthDtos {
 
     public record LoginRequest(
             @NotBlank(message = "Ten dang nhap khong duoc de trong") String username,
-            @NotBlank(message = "Mat khau khong duoc de trong") String password) {
+            @NotBlank(message = "Mat khau khong duoc de trong") String password,
+            Boolean human) {
     }
 
     public record RefreshRequest(String refreshToken) {
@@ -52,6 +53,8 @@ public final class AuthDtos {
             String role,
             String accessToken,
             String refreshToken,
-            long accessExpiresInMs) {
+            long accessExpiresInMs,
+            boolean emailVerified,
+            String devVerifyUrl) {
     }
 }

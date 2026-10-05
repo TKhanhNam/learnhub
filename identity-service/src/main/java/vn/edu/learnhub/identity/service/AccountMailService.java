@@ -73,6 +73,38 @@ public class AccountMailService {
         return dispatch(user.getEmail(), subject, body, user.getId());
     }
 
+    public EmailOutbox sendVerification(AppUser user, String verifyUrl) {
+        String subject = "Xác thực email LearnHub";
+        String body = """
+                <div style="font-family:Segoe UI,Arial,sans-serif;line-height:1.6;color:#1f1f1f">
+                  <h2 style="color:#2563eb">Xác thực email</h2>
+                  <p>Xin chào <strong>%s</strong>,</p>
+                  <p>Mở liên kết dưới đây để xác thực email trước khi thanh toán trên LearnHub. Liên kết có hiệu lực 24 giờ.</p>
+                  <p><a href="%s" style="color:#2563eb">%s</a></p>
+                  <p style="color:#5b616b">Nếu bạn không tạo tài khoản này, hãy bỏ qua email.</p>
+                </div>
+                """.formatted(escape(user.getFullName()), escape(verifyUrl), escape(verifyUrl));
+        return dispatch(user.getEmail(), subject, body, user.getId());
+    }
+
+    public EmailOutbox sendAttackNotice(AppUser admin, String detail) {
+        String subject = "Cảnh báo tấn công LearnHub";
+        String body = """
+                <div style="font-family:Segoe UI,Arial,sans-serif;line-height:1.6;color:#1f1f1f">
+                  <h2 style="color:#b45309">Phát hiện dấu hiệu tấn công</h2>
+                  <p>Xin chào <strong>%s</strong>,</p>
+                  <p>%s</p>
+                  <p>Vào mục <strong>Bảo mật</strong> trên cổng quản trị để chặn tài khoản hoặc máy gửi request.</p>
+                  <p style="color:#5b616b">LearnHub</p>
+                </div>
+                """.formatted(escape(admin.getFullName()), escape(detail));
+        return dispatch(admin.getEmail(), subject, body, admin.getId());
+    }
+
+    public boolean smtpConfigured() {
+        return mailHost != null && !mailHost.isBlank();
+    }
+
     public EmailOutbox sendUnlockNotice(AppUser user) {
         String subject = "Tài khoản LearnHub của bạn đã được mở khóa";
         String body = """

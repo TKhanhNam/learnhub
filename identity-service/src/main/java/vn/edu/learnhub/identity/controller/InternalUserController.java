@@ -15,6 +15,7 @@ import vn.edu.learnhub.identity.dto.UserDtos;
 import vn.edu.learnhub.identity.service.UserService;
 
 import java.util.List;
+import java.util.Map;
 
 @RestController
 @RequestMapping("/internal/users")
@@ -29,6 +30,11 @@ public class InternalUserController {
     @GetMapping("/{id}")
     public UserDtos.PublicUserDTO getUser(@PathVariable Long id) {
         return userService.getPublicById(id);
+    }
+
+    @GetMapping("/{id}/email-verified")
+    public Map<String, Boolean> emailVerified(@PathVariable Long id) {
+        return Map.of("emailVerified", userService.isEmailVerified(id));
     }
 
     @GetMapping("/by-email")
