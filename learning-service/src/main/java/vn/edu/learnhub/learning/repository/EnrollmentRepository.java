@@ -35,4 +35,10 @@ public interface EnrollmentRepository extends JpaRepository<Enrollment, Long> {
 
     @Query("select coalesce(avg(e.progressPercent), 0) from Enrollment e where e.courseId in :courseIds")
     Double averageProgress(@Param("courseIds") List<Long> courseIds);
+
+    @Query("select count(e) from Enrollment e where e.progressPercent >= 100")
+    long countAllCompleted();
+
+    @Query("select coalesce(avg(e.progressPercent), 0) from Enrollment e")
+    Double averageProgressAll();
 }
