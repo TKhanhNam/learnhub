@@ -4,7 +4,7 @@ San khoa hoc (kieu Udemy). Frontend chi goi API Gateway `http://localhost:8080`.
 
 ## Mo web (Windows)
 
-1. Bat **MySQL Server** (cong 3306, user `root` / `nam123`). 8 schema: `identity_db`, `catalog_db`, `content_db`, `commerce_db`, `learning_db`, `social_db`, `org_db`, `assist_db`.
+1. Bat **MySQL Server** (cong 3306, user `root` / `nam123`). 9 schema: `identity_db`, `catalog_db`, `content_db`, `commerce_db`, `learning_db`, `social_db`, `org_db`, `assist_db`, `payment_db`.
 2. Chay backend:
 
 ```powershell
