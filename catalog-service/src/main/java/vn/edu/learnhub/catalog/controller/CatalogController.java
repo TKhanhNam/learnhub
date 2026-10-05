@@ -7,6 +7,7 @@ package vn.edu.learnhub.catalog.controller;
 import jakarta.validation.Valid;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
+import org.springframework.data.domain.Sort;
 import org.springframework.data.web.PageableDefault;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.DeleteMapping;
@@ -96,7 +97,7 @@ public class CatalogController {
     @GetMapping("/instructor/courses")
     @PreAuthorize("hasAnyRole('INSTRUCTOR','ADMIN')")
     public ApiResponse<List<CatalogDtos.CourseSummaryDTO>> myCourses(
-            @PageableDefault(size = 10) Pageable pageable) {
+            @PageableDefault(size = 200, sort = "id", direction = Sort.Direction.DESC) Pageable pageable) {
         return ApiResponse.page(catalogService.getMyCourses(CurrentUser.requireId(), pageable));
     }
 
