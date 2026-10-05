@@ -1,11 +1,12 @@
 package vn.edu.learnhub.assist.controller;
 
 import jakarta.validation.Valid;
-import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.*;
 import vn.edu.learnhub.assist.dto.AssistDtos;
 import vn.edu.learnhub.assist.service.AssistService;
 import vn.edu.learnhub.platform.api.ApiResponse;
+import vn.edu.learnhub.platform.error.BusinessException;
+import vn.edu.learnhub.platform.security.AuthUser;
 import vn.edu.learnhub.platform.security.CurrentUser;
 
 import java.util.List;
@@ -24,19 +25,22 @@ public class AssistController {
         return ApiResponse.ok(assistService.help(locale));
     }
 
-    @GetMapping("/ai-fee")
-    public ApiResponse<AssistDtos.FeeDTO> fee() {
-        return ApiResponse.ok(assistService.fee());
-    }
-
-    @PatchMapping("/admin/ai-fee")
-    @PreAuthorize("hasRole('ADMIN')")
-    public ApiResponse<AssistDtos.FeeDTO> updateFee(@Valid @RequestBody AssistDtos.FeeUpdateRequest request) {
-        return ApiResponse.ok(assistService.updateFee(request.extraPercent()), "Da cap nhat phi AI");
+    @PostMapping("/guest-chat")
+    public ApiResponse<AssistDtos.ChatDTO> guestChat(@Valid @RequestBody AssistDtos.ChatRequest request) {
+        return ApiResponse.ok(assistService.guestChat(request));
     }
 
     @PostMapping("/chat")
     public ApiResponse<AssistDtos.ChatDTO> chat(@Valid @RequestBody AssistDtos.ChatRequest request) {
-        return ApiResponse.ok(assistService.chat(CurrentUser.requireId(), request), "Tra loi tu tro ly demo");
+        return ApiResponse.ok(assistService.chat(CurrentUser.require(), request));
+    }
+
+    @PostMapping("/admin/chat")
+    public ApiResponse<AssistDtos.ChatDTO> adminChat(@Valid @RequestBody AssistDtos.ChatRequest request) {
+        AuthUser user = CurrentUser.require();
+        if (!user.isAdmin()) {
+            throw BusinessException.forbidden("Chi tai khoan admin moi xem bao cao");
+        }
+        return ApiResponse.ok(assistService.adminChat(user, request));
     }
 }
