@@ -130,4 +130,7 @@ public final class LearningDtos {
 
     public record InstructorStatsDTO(long totalEnrollments, long completedEnrollments, double averageProgress) {
     }
+
+    public record MyLearningSummaryDTO(long totalCourses, long completedCourses, double averageProgress) {
+    }
 }

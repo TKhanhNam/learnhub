@@ -314,6 +314,19 @@ public class EnrollmentService {
         return new LearningDtos.InstructorStatsDTO(total, completed, average == null ? 0 : average);
     }
 
+    public LearningDtos.MyLearningSummaryDTO mySummary(Long userId) {
+        List<Enrollment> enrollments = enrollmentRepository.findByUserId(userId);
+        long total = enrollments.size();
+        long completed = enrollments.stream()
+                .filter(e -> e.getProgressPercent() != null && e.getProgressPercent() >= 100)
+                .count();
+        double average = enrollments.stream()
+                .mapToInt(e -> e.getProgressPercent() == null ? 0 : e.getProgressPercent())
+                .average()
+                .orElse(0);
+        return new LearningDtos.MyLearningSummaryDTO(total, completed, Math.round(average * 100.0) / 100.0);
+    }
+
     public long countByCourse(Long courseId) {
         return enrollmentRepository.countByCourseId(courseId);
     }

@@ -49,6 +49,11 @@ public class LearningController {
         return ApiResponse.page(enrollmentService.myCourses(CurrentUser.requireId(), pageable));
     }
 
+    @GetMapping("/my-summary")
+    public ApiResponse<LearningDtos.MyLearningSummaryDTO> mySummary() {
+        return ApiResponse.ok(enrollmentService.mySummary(CurrentUser.requireId()));
+    }
+
     @GetMapping("/access/{courseId}")
     public ApiResponse<LearningDtos.AccessDTO> access(@PathVariable Long courseId) {
         return ApiResponse.ok(enrollmentService.checkAccess(CurrentUser.requireId(), courseId));
