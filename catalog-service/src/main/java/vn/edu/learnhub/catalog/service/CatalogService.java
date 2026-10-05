@@ -171,9 +171,11 @@ public class CatalogService {
     }
 
     public Page<CatalogDtos.CourseSummaryDTO> getMyCourses(Long instructorId, Pageable pageable) {
-        Pageable sorted = pageable.getSort().isSorted()
-                ? pageable
-                : PageRequest.of(pageable.getPageNumber(), pageable.getPageSize(), Sort.by(Sort.Direction.DESC, "id"));
+        int size = Math.min(Math.max(pageable.getPageSize(), 1), 200);
+        Sort sort = pageable.getSort().isSorted()
+                ? pageable.getSort()
+                : Sort.by(Sort.Direction.DESC, "id");
+        Pageable sorted = PageRequest.of(pageable.getPageNumber(), size, sort);
         return courseRepository.findByInstructorId(instructorId, sorted).map(this::toSummary);
     }
 
