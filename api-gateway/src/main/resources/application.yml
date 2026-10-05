@@ -101,6 +101,14 @@ spring:
           filters:
             - RewritePath=/api/assist/(?<seg>.*), /assist/${seg}
 
+        # ---------- payment-service (MoMo return / IPN). /link chi goi noi bo, khong mo qua gateway ----------
+        - id: payment
+          uri: ${services.payment-url}
+          predicates:
+            - Path=/api/payment/**
+          filters:
+            - RewritePath=/api/payment/(?<seg>.*), /payment/${seg}
+
 # Dia chi cac service - chay local thi dung localhost, chay Docker thi truyen bien moi truong
 services:
   identity-url: ${IDENTITY_URL:http://localhost:8081}
@@ -111,6 +119,7 @@ services:
   social-url: ${SOCIAL_URL:http://localhost:8086}
   org-url: ${ORG_URL:http://localhost:8087}
   assist-url: ${ASSIST_URL:http://localhost:8088}
+  payment-url: ${PAYMENT_URL:http://localhost:8089}
 
 # API Key cho doi tac ngoai (Buoi 10)
 partner:
@@ -120,8 +129,15 @@ partner:
 # ban production chuyen sang Redis - xem README muc "Lo trinh production".
 ratelimit:
   enabled: true
-  capacity: 120
-  refill-per-minute: 120
+  # Moi may: bung 100 request khi mo trang, roi khoang 200 request/phut. Du de xem khoa hoc, thap de chan vong lap.
+  capacity: 100
+  refill-per-minute: 200
+  # Dang nhap / dang ky: 15 lan/phut/may. Nguoi dung go sai mat khau van qua; phong mat khau thi khong.
+  auth-capacity: 15
+  auth-refill-per-minute: 15
+
+internal:
+  api-key: ${INTERNAL_KEY:learnhub-internal-key-2026}
 
 logging:
   pattern:

@@ -27,6 +27,9 @@ public class AuthHeaderFilter implements GlobalFilter, Ordered {
             "/api/auth/register",
             "/api/auth/refresh",
             "/api/auth/logout",
+            "/api/assist/guest-chat",
+            "/api/auth/verify-email",
+            "/api/payment/momo/",
             "/api/public/"
     );
 
