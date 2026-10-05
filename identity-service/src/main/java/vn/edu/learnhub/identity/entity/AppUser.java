@@ -63,6 +63,9 @@ public class AppUser {
     @Column(nullable = false, length = 5)
     private String language = "vi";
 
+    @Column(name = "email_verified_at")
+    private Instant emailVerifiedAt;
+
     @Column(name = "created_at", nullable = false)
     private Instant createdAt = Instant.now();
 
@@ -192,6 +195,14 @@ public class AppUser {
 
     public void setLanguage(String language) {
         this.language = language;
+    }
+
+    public Instant getEmailVerifiedAt() {
+        return emailVerifiedAt;
+    }
+
+    public void setEmailVerifiedAt(Instant emailVerifiedAt) {
+        this.emailVerifiedAt = emailVerifiedAt;
     }
 
     public Instant getCreatedAt() {
