@@ -18,6 +18,10 @@ public final class CommerceDtos {
 
     public record CheckoutRequest(String couponCode, boolean gift, Long recipientUserId, String recipientEmail) {}
 
+    public record CheckoutResult(OrderDTO order, String payUrl) {}
+
+    public record MomoNotice(Long commerceOrderId, Long amount, String paymentRef) {}
+
     public record OrderItemDTO(Long courseId, String title, BigDecimal price, Long instructorId, boolean aiAssist) {}
 
     public record OrderDTO(Long id, Long buyerId, Long recipientId, String recipientEmail, String status,

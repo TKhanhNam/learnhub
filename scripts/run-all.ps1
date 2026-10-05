@@ -1,6 +1,6 @@
 # path: scripts/run-all.ps1
-# purpose: chay ca 9 service backend tren may Windows (khong can Docker).
-# Yeu cau: MySQL (XAMPP) dang chay va da tao 8 database bang scripts/init-databases.sql
+# purpose: chay ca 10 service backend tren may Windows (khong can Docker).
+# Yeu cau: MySQL (XAMPP) dang chay va da tao 9 database bang scripts/init-databases.sql
 #
 #   powershell -ExecutionPolicy Bypass -File scripts\run-all.ps1
 
@@ -16,6 +16,7 @@ $services = @(
     @{ Name = "social-service";   Port = 8086 },
     @{ Name = "org-service";      Port = 8087 },
     @{ Name = "assist-service";   Port = 8088 },
+    @{ Name = "payment-service";  Port = 8089 },
     @{ Name = "api-gateway";      Port = 8080 }
 )
 

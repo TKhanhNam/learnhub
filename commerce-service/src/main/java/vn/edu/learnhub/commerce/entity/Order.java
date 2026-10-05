@@ -14,6 +14,7 @@ import java.time.Instant;
 @Table(name = "orders")
 public class Order {
 
+    public static final String PENDING = "PENDING";
     public static final String PAID = "PAID";
     public static final String FAILED = "FAILED";
 
@@ -31,7 +32,7 @@ public class Order {
     private String recipientEmail;
 
     @Column(nullable = false, length = 20)
-    private String status = PAID;
+    private String status = PENDING;
 
     @Column(name = "coupon_code", length = 40)
     private String couponCode;

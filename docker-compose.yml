@@ -137,6 +137,8 @@ services:
       INTERNAL_KEY: ${INTERNAL_KEY:-learnhub-internal-key-2026}
       CATALOG_INTERNAL_URL: http://catalog-service:8082
       LEARNING_INTERNAL_URL: http://learning-service:8083
+      IDENTITY_INTERNAL_URL: http://identity-service:8081
+      PAYMENT_URL: http://payment-service:8089
     depends_on:
       mysql:
         condition: service_healthy
@@ -203,6 +205,26 @@ services:
     ports:
       - "8088:8088"
 
+  payment-service:
+    build:
+      context: .
+      args:
+        SERVICE: payment-service
+    environment:
+      DB_HOST: mysql
+      DB_PORT: 3306
+      DB_USER: root
+      DB_PASSWORD: ${DB_PASSWORD:-nam123}
+      JWT_SECRET: ${JWT_SECRET:-LearnHub-Shared-Secret-Key-2026-Doi-Trong-Moi-Truong-That}
+      INTERNAL_KEY: ${INTERNAL_KEY:-learnhub-internal-key-2026}
+      COMMERCE_URL: http://commerce-service:8085
+      WEB_RESULT_URL: ${WEB_RESULT_URL:-http://localhost:5173/payment/result}
+    depends_on:
+      mysql:
+        condition: service_healthy
+    ports:
+      - "8089:8089"
+
   # ----------------------------------------------------------- cong vao duy nhat
   api-gateway:
     build:
@@ -218,6 +240,7 @@ services:
       SOCIAL_URL: http://social-service:8086
       ORG_URL: http://org-service:8087
       ASSIST_URL: http://assist-service:8088
+      PAYMENT_URL: http://payment-service:8089
     depends_on:
       - identity-service
       - catalog-service
@@ -227,6 +250,7 @@ services:
       - social-service
       - org-service
       - assist-service
+      - payment-service
     ports:
       - "8080:8080"
 
