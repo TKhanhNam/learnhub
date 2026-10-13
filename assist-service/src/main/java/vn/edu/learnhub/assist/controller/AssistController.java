@@ -35,8 +35,20 @@ public class AssistController {
         return ApiResponse.ok(assistService.updateFee(request.extraPercent()), "Da cap nhat phi AI");
     }
 
+    @GetMapping("/admin/ai-keys")
+    @PreAuthorize("hasRole('ADMIN')")
+    public ApiResponse<List<AssistDtos.AiKeyDTO>> aiKeys() {
+        return ApiResponse.ok(assistService.aiKeys());
+    }
+
     @PostMapping("/chat")
     public ApiResponse<AssistDtos.ChatDTO> chat(@Valid @RequestBody AssistDtos.ChatRequest request) {
-        return ApiResponse.ok(assistService.chat(CurrentUser.requireId(), request), "Tra loi tu tro ly demo");
+        var user = CurrentUser.require();
+        return ApiResponse.ok(assistService.chat(user.userId(), user.role(), request), "Tra loi tu tro ly");
+    }
+
+    @PostMapping("/guest-chat")
+    public ApiResponse<AssistDtos.ChatDTO> guestChat(@Valid @RequestBody AssistDtos.ChatRequest request) {
+        return ApiResponse.ok(assistService.guestChat(request), "Tra loi cho khach");
     }
 }

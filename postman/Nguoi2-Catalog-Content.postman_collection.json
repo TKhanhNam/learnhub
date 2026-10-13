@@ -1,0 +1,601 @@
+{
+  "info": {
+    "name": "LearnHub - Nguoi 2 - Khoa hoc va noi dung",
+    "description": "Kich ban test catalog-service va content-service qua API Gateway. Chay theo thu tu tu tren xuong (Run collection).",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+  },
+  "variable": [
+    { "key": "baseUrl", "value": "http://localhost:8080/api" },
+    { "key": "contentDirectUrl", "value": "http://localhost:8084" },
+    { "key": "internalKey", "value": "learnhub-internal-key-2026" },
+    { "key": "teacherToken", "value": "" },
+    { "key": "adminToken", "value": "" },
+    { "key": "studentToken", "value": "" },
+    { "key": "categoryId", "value": "" },
+    { "key": "seedSlug", "value": "" },
+    { "key": "courseTitle", "value": "" },
+    { "key": "courseId", "value": "" },
+    { "key": "courseSlug", "value": "" },
+    { "key": "lectureId", "value": "" },
+    { "key": "lectureId2", "value": "" },
+    { "key": "quizId", "value": "" }
+  ],
+  "item": [
+    {
+      "name": "00 - Dang nhap",
+      "item": [
+        {
+          "name": "Dang nhap giang vien teacher1",
+          "event": [{ "listen": "test", "script": { "exec": [
+            "pm.test('200 OK', () => pm.response.to.have.status(200));",
+            "const d = pm.response.json().data;",
+            "pm.test('Role la INSTRUCTOR', () => pm.expect(d.role).to.eql('INSTRUCTOR'));",
+            "pm.collectionVariables.set('teacherToken', d.accessToken);"
+          ] } }],
+          "request": {
+            "method": "POST",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "url": "{{baseUrl}}/auth/login",
+            "body": { "mode": "raw", "raw": "{\n  \"username\": \"teacher1\",\n  \"password\": \"teacher123\",\n  \"human\": true\n}" }
+          }
+        },
+        {
+          "name": "Dang nhap admin",
+          "event": [{ "listen": "test", "script": { "exec": [
+            "pm.test('200 OK', () => pm.response.to.have.status(200));",
+            "const d = pm.response.json().data;",
+            "pm.test('Role la ADMIN', () => pm.expect(d.role).to.eql('ADMIN'));",
+            "pm.collectionVariables.set('adminToken', d.accessToken);"
+          ] } }],
+          "request": {
+            "method": "POST",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "url": "{{baseUrl}}/auth/login",
+            "body": { "mode": "raw", "raw": "{\n  \"username\": \"admin\",\n  \"password\": \"admin123\",\n  \"human\": true\n}" }
+          }
+        },
+        {
+          "name": "Dang nhap hoc vien student1",
+          "event": [{ "listen": "test", "script": { "exec": [
+            "pm.test('200 OK', () => pm.response.to.have.status(200));",
+            "pm.collectionVariables.set('studentToken', pm.response.json().data.accessToken);"
+          ] } }],
+          "request": {
+            "method": "POST",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "url": "{{baseUrl}}/auth/login",
+            "body": { "mode": "raw", "raw": "{\n  \"username\": \"student1\",\n  \"password\": \"student123\",\n  \"human\": true\n}" }
+          }
+        }
+      ]
+    },
+    {
+      "name": "01 - Use case Tim khoa hoc (public)",
+      "item": [
+        {
+          "name": "Lay danh sach danh muc",
+          "event": [{ "listen": "test", "script": { "exec": [
+            "pm.test('200 OK', () => pm.response.to.have.status(200));",
+            "const list = pm.response.json().data;",
+            "pm.test('Co it nhat 1 danh muc', () => pm.expect(list.length).to.be.above(0));",
+            "pm.collectionVariables.set('categoryId', list[0].id);"
+          ] } }],
+          "request": { "method": "GET", "url": "{{baseUrl}}/catalog/categories" }
+        },
+        {
+          "name": "Tim khoa hoc theo tu khoa",
+          "event": [{ "listen": "test", "script": { "exec": [
+            "pm.test('200 OK', () => pm.response.to.have.status(200));",
+            "const list = pm.response.json().data;",
+            "pm.test('Tra ve danh sach', () => pm.expect(list).to.be.an('array'));",
+            "pm.test('Chi tra khoa PUBLISHED', () => list.forEach(c => pm.expect(c.status).to.eql('PUBLISHED')));"
+          ] } }],
+          "request": { "method": "GET", "url": "{{baseUrl}}/catalog/courses?keyword=java&page=0&size=5" }
+        },
+        {
+          "name": "Loc theo danh muc + khoang gia + sap xep",
+          "event": [{ "listen": "test", "script": { "exec": [
+            "pm.test('200 OK', () => pm.response.to.have.status(200));",
+            "const list = pm.response.json().data;",
+            "pm.test('Gia nam trong khoang 0 - 2.000.000', () => list.forEach(c => pm.expect(Number(c.price)).to.be.within(0, 2000000)));",
+            "if (list.length > 0) pm.collectionVariables.set('seedSlug', list[0].slug);"
+          ] } }],
+          "request": { "method": "GET", "url": "{{baseUrl}}/catalog/courses?category=lap-trinh&minPrice=0&maxPrice=2000000&sort=price,asc" }
+        },
+        {
+          "name": "Xem chi tiet khoa hoc theo slug",
+          "event": [{ "listen": "test", "script": { "exec": [
+            "pm.test('200 OK', () => pm.response.to.have.status(200));",
+            "pm.test('Dung slug', () => pm.expect(pm.response.json().data.slug).to.eql(pm.collectionVariables.get('seedSlug')));"
+          ] } }],
+          "request": { "method": "GET", "url": "{{baseUrl}}/catalog/courses/{{seedSlug}}" }
+        },
+        {
+          "name": "Khoa ban chay va ky nang thinh hanh",
+          "event": [{ "listen": "test", "script": { "exec": [
+            "pm.test('200 OK', () => pm.response.to.have.status(200));"
+          ] } }],
+          "request": { "method": "GET", "url": "{{baseUrl}}/catalog/best-sellers?limit=5" }
+        },
+        {
+          "name": "[Loi] Danh muc khong ton tai -> 404",
+          "event": [{ "listen": "test", "script": { "exec": [
+            "pm.test('404 Not Found', () => pm.response.to.have.status(404));",
+            "pm.test('success = false', () => pm.expect(pm.response.json().success).to.eql(false));"
+          ] } }],
+          "request": { "method": "GET", "url": "{{baseUrl}}/catalog/courses?category=khong-ton-tai" }
+        }
+      ]
+    },
+    {
+      "name": "02 - Giang vien tao khoa hoc",
+      "item": [
+        {
+          "name": "[Loi] Khong co token -> 401/403",
+          "event": [{ "listen": "test", "script": { "exec": [
+            "pm.test('Bi chan', () => pm.expect(pm.response.code).to.be.oneOf([401, 403]));"
+          ] } }],
+          "request": {
+            "method": "POST",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "url": "{{baseUrl}}/catalog/courses",
+            "body": { "mode": "raw", "raw": "{\n  \"title\": \"Khoa khong token\",\n  \"categoryId\": {{categoryId}},\n  \"price\": 100000\n}" }
+          }
+        },
+        {
+          "name": "[Loi] Hoc vien tao khoa -> 403",
+          "event": [{ "listen": "test", "script": { "exec": [
+            "pm.test('403 Forbidden', () => pm.response.to.have.status(403));"
+          ] } }],
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Content-Type", "value": "application/json" },
+              { "key": "Authorization", "value": "Bearer {{studentToken}}" }
+            ],
+            "url": "{{baseUrl}}/catalog/courses",
+            "body": { "mode": "raw", "raw": "{\n  \"title\": \"Hoc vien tao khoa\",\n  \"categoryId\": {{categoryId}},\n  \"price\": 100000\n}" }
+          }
+        },
+        {
+          "name": "[Loi] Thieu tieu de -> 400",
+          "event": [{ "listen": "test", "script": { "exec": [
+            "pm.test('400 Bad Request', () => pm.response.to.have.status(400));"
+          ] } }],
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Content-Type", "value": "application/json" },
+              { "key": "Authorization", "value": "Bearer {{teacherToken}}" }
+            ],
+            "url": "{{baseUrl}}/catalog/courses",
+            "body": { "mode": "raw", "raw": "{\n  \"title\": \"\",\n  \"categoryId\": {{categoryId}},\n  \"price\": 100000\n}" }
+          }
+        },
+        {
+          "name": "Tao khoa hoc moi (trang thai DRAFT)",
+          "event": [
+            { "listen": "prerequest", "script": { "exec": [
+              "pm.collectionVariables.set('courseTitle', 'Postman Spring Boot ' + Date.now());"
+            ] } },
+            { "listen": "test", "script": { "exec": [
+              "pm.test('201 Created', () => pm.response.to.have.status(201));",
+              "const d = pm.response.json().data;",
+              "pm.test('Trang thai DRAFT', () => pm.expect(d.status).to.eql('DRAFT'));",
+              "pm.collectionVariables.set('courseId', d.id);",
+              "pm.collectionVariables.set('courseSlug', d.slug);"
+            ] } }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Content-Type", "value": "application/json" },
+              { "key": "Authorization", "value": "Bearer {{teacherToken}}" }
+            ],
+            "url": "{{baseUrl}}/catalog/courses",
+            "body": { "mode": "raw", "raw": "{\n  \"title\": \"{{courseTitle}}\",\n  \"subtitle\": \"Khoa hoc tao tu Postman\",\n  \"description\": \"Mo ta khoa hoc test\",\n  \"categoryId\": {{categoryId}},\n  \"price\": 299000,\n  \"level\": \"BEGINNER\",\n  \"language\": \"vi\",\n  \"skills\": [\"Java\", \"Spring Boot\"],\n  \"aiAssistEnabled\": true\n}" }
+          }
+        },
+        {
+          "name": "Cap nhat khoa hoc",
+          "event": [{ "listen": "test", "script": { "exec": [
+            "pm.test('200 OK', () => pm.response.to.have.status(200));",
+            "pm.test('Gia da doi', () => pm.expect(Number(pm.response.json().data.price)).to.eql(199000));"
+          ] } }],
+          "request": {
+            "method": "PUT",
+            "header": [
+              { "key": "Content-Type", "value": "application/json" },
+              { "key": "Authorization", "value": "Bearer {{teacherToken}}" }
+            ],
+            "url": "{{baseUrl}}/catalog/courses/{{courseId}}",
+            "body": { "mode": "raw", "raw": "{\n  \"title\": \"{{courseTitle}}\",\n  \"subtitle\": \"Da cap nhat\",\n  \"categoryId\": {{categoryId}},\n  \"price\": 199000,\n  \"level\": \"BEGINNER\",\n  \"skills\": [\"Java\", \"Spring Boot\", \"REST API\"]\n}" }
+          }
+        },
+        {
+          "name": "Danh sach khoa cua giang vien",
+          "event": [{ "listen": "test", "script": { "exec": [
+            "pm.test('200 OK', () => pm.response.to.have.status(200));",
+            "const id = Number(pm.collectionVariables.get('courseId'));",
+            "pm.test('Co khoa vua tao', () => pm.expect(pm.response.json().data.map(c => c.id)).to.include(id));"
+          ] } }],
+          "request": {
+            "method": "GET",
+            "header": [{ "key": "Authorization", "value": "Bearer {{teacherToken}}" }],
+            "url": "{{baseUrl}}/catalog/instructor/courses"
+          }
+        },
+        {
+          "name": "[Loi] Khach xem khoa DRAFT -> 404",
+          "event": [{ "listen": "test", "script": { "exec": [
+            "pm.test('404 Not Found', () => pm.response.to.have.status(404));"
+          ] } }],
+          "request": { "method": "GET", "url": "{{baseUrl}}/catalog/courses/{{courseId}}" }
+        }
+      ]
+    },
+    {
+      "name": "03 - Bai giang, quiz, dap an",
+      "item": [
+        {
+          "name": "Them bai giang VIDEO",
+          "event": [{ "listen": "test", "script": { "exec": [
+            "pm.test('201 Created', () => pm.response.to.have.status(201));",
+            "pm.collectionVariables.set('lectureId', pm.response.json().data.id);"
+          ] } }],
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Content-Type", "value": "application/json" },
+              { "key": "Authorization", "value": "Bearer {{teacherToken}}" }
+            ],
+            "url": "{{baseUrl}}/content/courses/{{courseId}}/lectures",
+            "body": { "mode": "raw", "raw": "{\n  \"title\": \"Bai 1 - Gioi thieu\",\n  \"type\": \"VIDEO\",\n  \"videoUrl\": \"https://interactive-examples.mdn.mozilla.net/media/cc0-videos/flower.mp4\",\n  \"durationSeconds\": 120,\n  \"sortOrder\": 1\n}" }
+          }
+        },
+        {
+          "name": "Them bai giang TEXT",
+          "event": [{ "listen": "test", "script": { "exec": [
+            "pm.test('201 Created', () => pm.response.to.have.status(201));",
+            "pm.collectionVariables.set('lectureId2', pm.response.json().data.id);"
+          ] } }],
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Content-Type", "value": "application/json" },
+              { "key": "Authorization", "value": "Bearer {{teacherToken}}" }
+            ],
+            "url": "{{baseUrl}}/content/courses/{{courseId}}/lectures",
+            "body": { "mode": "raw", "raw": "{\n  \"title\": \"Bai 2 - Tai lieu\",\n  \"type\": \"TEXT\",\n  \"bodyHtml\": \"<p>Noi dung bai doc</p>\",\n  \"durationSeconds\": 300,\n  \"sortOrder\": 2\n}" }
+          }
+        },
+        {
+          "name": "Sua bai giang",
+          "event": [{ "listen": "test", "script": { "exec": [
+            "pm.test('200 OK', () => pm.response.to.have.status(200));",
+            "pm.test('Tieu de moi', () => pm.expect(pm.response.json().data.title).to.eql('Bai 1 - Gioi thieu (sua)'));"
+          ] } }],
+          "request": {
+            "method": "PUT",
+            "header": [
+              { "key": "Content-Type", "value": "application/json" },
+              { "key": "Authorization", "value": "Bearer {{teacherToken}}" }
+            ],
+            "url": "{{baseUrl}}/content/lectures/{{lectureId}}",
+            "body": { "mode": "raw", "raw": "{\n  \"title\": \"Bai 1 - Gioi thieu (sua)\",\n  \"type\": \"VIDEO\",\n  \"durationSeconds\": 150,\n  \"sortOrder\": 1\n}" }
+          }
+        },
+        {
+          "name": "Doi thu tu bai giang",
+          "event": [{ "listen": "test", "script": { "exec": [
+            "pm.test('200 OK', () => pm.response.to.have.status(200));",
+            "const first = pm.response.json().data[0];",
+            "pm.test('Bai TEXT len dau', () => pm.expect(first.id).to.eql(Number(pm.collectionVariables.get('lectureId2'))));"
+          ] } }],
+          "request": {
+            "method": "PUT",
+            "header": [
+              { "key": "Content-Type", "value": "application/json" },
+              { "key": "Authorization", "value": "Bearer {{teacherToken}}" }
+            ],
+            "url": "{{baseUrl}}/content/courses/{{courseId}}/lectures/reorder",
+            "body": { "mode": "raw", "raw": "{\n  \"lectureIds\": [{{lectureId2}}, {{lectureId}}]\n}" }
+          }
+        },
+        {
+          "name": "Tao quiz kem cau hoi va dap an",
+          "event": [{ "listen": "test", "script": { "exec": [
+            "pm.test('201 Created', () => pm.response.to.have.status(201));",
+            "const d = pm.response.json().data;",
+            "pm.test('Co 2 cau hoi', () => pm.expect(d.questions.length).to.eql(2));",
+            "pm.test('Khong lo dap an ra ngoai', () => pm.expect(d.questions[0]).to.not.have.property('correctOption'));",
+            "pm.collectionVariables.set('quizId', d.id);"
+          ] } }],
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Content-Type", "value": "application/json" },
+              { "key": "Authorization", "value": "Bearer {{teacherToken}}" }
+            ],
+            "url": "{{baseUrl}}/content/courses/{{courseId}}/quizzes",
+            "body": { "mode": "raw", "raw": "{\n  \"title\": \"Quiz chuong 1\",\n  \"kind\": \"QUIZ\",\n  \"passScore\": 70,\n  \"questions\": [\n    {\n      \"prompt\": \"Spring Boot viet bang ngon ngu nao?\",\n      \"optionA\": \"Python\",\n      \"optionB\": \"Java\",\n      \"optionC\": \"C#\",\n      \"optionD\": \"PHP\",\n      \"correctOption\": \"B\"\n    },\n    {\n      \"prompt\": \"Frontend goi vao dau?\",\n      \"optionA\": \"API Gateway\",\n      \"optionB\": \"MySQL\",\n      \"correctOption\": \"a\"\n    }\n  ]\n}" }
+          }
+        },
+        {
+          "name": "Tao bai tap",
+          "event": [{ "listen": "test", "script": { "exec": [
+            "pm.test('201 Created', () => pm.response.to.have.status(201));"
+          ] } }],
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Content-Type", "value": "application/json" },
+              { "key": "Authorization", "value": "Bearer {{teacherToken}}" }
+            ],
+            "url": "{{baseUrl}}/content/courses/{{courseId}}/assignments",
+            "body": { "mode": "raw", "raw": "{\n  \"title\": \"Bai tap nop link GitHub\",\n  \"instruction\": \"Lam mot REST API nho roi dan link repository.\"\n}" }
+          }
+        },
+        {
+          "name": "[Loi] Hoc vien them bai giang -> 403",
+          "event": [{ "listen": "test", "script": { "exec": [
+            "pm.test('403 Forbidden', () => pm.response.to.have.status(403));"
+          ] } }],
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Content-Type", "value": "application/json" },
+              { "key": "Authorization", "value": "Bearer {{studentToken}}" }
+            ],
+            "url": "{{baseUrl}}/content/courses/{{courseId}}/lectures",
+            "body": { "mode": "raw", "raw": "{\n  \"title\": \"Hoc vien chen bai\"\n}" }
+          }
+        },
+        {
+          "name": "[Loi] Quiz thieu dap an dung -> 400",
+          "event": [{ "listen": "test", "script": { "exec": [
+            "pm.test('400 Bad Request', () => pm.response.to.have.status(400));"
+          ] } }],
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Content-Type", "value": "application/json" },
+              { "key": "Authorization", "value": "Bearer {{teacherToken}}" }
+            ],
+            "url": "{{baseUrl}}/content/courses/{{courseId}}/quizzes",
+            "body": { "mode": "raw", "raw": "{\n  \"title\": \"Quiz loi\",\n  \"questions\": [\n    { \"prompt\": \"Cau hoi?\", \"optionA\": \"A\", \"optionB\": \"B\" }\n  ]\n}" }
+          }
+        },
+        {
+          "name": "Xem curriculum - giang vien (mo khoa)",
+          "event": [{ "listen": "test", "script": { "exec": [
+            "pm.test('200 OK', () => pm.response.to.have.status(200));",
+            "const d = pm.response.json().data;",
+            "pm.test('Co 2 bai giang', () => pm.expect(d.lectures.length).to.eql(2));",
+            "pm.test('Thay duoc cau hoi quiz', () => pm.expect(d.quizzes[0].questions.length).to.be.above(0));"
+          ] } }],
+          "request": {
+            "method": "GET",
+            "header": [{ "key": "Authorization", "value": "Bearer {{teacherToken}}" }],
+            "url": "{{baseUrl}}/content/courses/{{courseId}}/curriculum"
+          }
+        },
+        {
+          "name": "Xem curriculum - khach (bi khoa noi dung)",
+          "event": [{ "listen": "test", "script": { "exec": [
+            "pm.test('200 OK', () => pm.response.to.have.status(200));",
+            "const d = pm.response.json().data;",
+            "pm.test('An videoUrl', () => d.lectures.forEach(l => pm.expect(l.videoUrl).to.eql(null)));",
+            "pm.test('An cau hoi quiz', () => pm.expect(d.quizzes[0].questions.length).to.eql(0));"
+          ] } }],
+          "request": { "method": "GET", "url": "{{baseUrl}}/content/courses/{{courseId}}/curriculum" }
+        },
+        {
+          "name": "Dap an quiz (API noi bo, goi thang 8084)",
+          "event": [{ "listen": "test", "script": { "exec": [
+            "pm.test('200 OK', () => pm.response.to.have.status(200));",
+            "const keys = pm.response.json().questions.map(q => q.correctOption);",
+            "pm.test('Dap an dung la B, A', () => pm.expect(keys).to.eql(['B', 'A']));"
+          ] } }],
+          "request": {
+            "method": "GET",
+            "header": [{ "key": "X-Internal-Key", "value": "{{internalKey}}" }],
+            "url": "{{contentDirectUrl}}/internal/quizzes/{{quizId}}/answer-key"
+          }
+        },
+        {
+          "name": "[Loi] Dap an quiz khong co X-Internal-Key -> 401",
+          "event": [{ "listen": "test", "script": { "exec": [
+            "pm.test('401 Unauthorized', () => pm.response.to.have.status(401));"
+          ] } }],
+          "request": { "method": "GET", "url": "{{contentDirectUrl}}/internal/quizzes/{{quizId}}/answer-key" }
+        }
+      ]
+    },
+    {
+      "name": "04 - Use case Gui duyet va phe duyet",
+      "item": [
+        {
+          "name": "Giang vien gui duyet -> PENDING",
+          "event": [{ "listen": "test", "script": { "exec": [
+            "pm.test('200 OK', () => pm.response.to.have.status(200));",
+            "pm.test('Trang thai PENDING', () => pm.expect(pm.response.json().data.status).to.eql('PENDING'));"
+          ] } }],
+          "request": {
+            "method": "PATCH",
+            "header": [{ "key": "Authorization", "value": "Bearer {{teacherToken}}" }],
+            "url": "{{baseUrl}}/catalog/courses/{{courseId}}/submit"
+          }
+        },
+        {
+          "name": "Admin xem hang cho duyet",
+          "event": [{ "listen": "test", "script": { "exec": [
+            "pm.test('200 OK', () => pm.response.to.have.status(200));",
+            "const id = Number(pm.collectionVariables.get('courseId'));",
+            "pm.test('Khoa nam trong danh sach PENDING', () => pm.expect(pm.response.json().data.map(c => c.id)).to.include(id));"
+          ] } }],
+          "request": {
+            "method": "GET",
+            "header": [{ "key": "Authorization", "value": "Bearer {{adminToken}}" }],
+            "url": "{{baseUrl}}/catalog/admin/courses?status=PENDING&size=100"
+          }
+        },
+        {
+          "name": "[Loi] Giang vien tu duyet -> 403",
+          "event": [{ "listen": "test", "script": { "exec": [
+            "pm.test('403 Forbidden', () => pm.response.to.have.status(403));"
+          ] } }],
+          "request": {
+            "method": "PATCH",
+            "header": [
+              { "key": "Content-Type", "value": "application/json" },
+              { "key": "Authorization", "value": "Bearer {{teacherToken}}" }
+            ],
+            "url": "{{baseUrl}}/catalog/admin/courses/{{courseId}}/moderate",
+            "body": { "mode": "raw", "raw": "{\n  \"action\": \"APPROVE\"\n}" }
+          }
+        },
+        {
+          "name": "[Loi] Hanh dong sai -> 400",
+          "event": [{ "listen": "test", "script": { "exec": [
+            "pm.test('400 Bad Request', () => pm.response.to.have.status(400));"
+          ] } }],
+          "request": {
+            "method": "PATCH",
+            "header": [
+              { "key": "Content-Type", "value": "application/json" },
+              { "key": "Authorization", "value": "Bearer {{adminToken}}" }
+            ],
+            "url": "{{baseUrl}}/catalog/admin/courses/{{courseId}}/moderate",
+            "body": { "mode": "raw", "raw": "{\n  \"action\": \"ABC\"\n}" }
+          }
+        },
+        {
+          "name": "Admin tu choi -> REJECTED",
+          "event": [{ "listen": "test", "script": { "exec": [
+            "pm.test('200 OK', () => pm.response.to.have.status(200));",
+            "pm.test('Trang thai REJECTED', () => pm.expect(pm.response.json().data.status).to.eql('REJECTED'));"
+          ] } }],
+          "request": {
+            "method": "PATCH",
+            "header": [
+              { "key": "Content-Type", "value": "application/json" },
+              { "key": "Authorization", "value": "Bearer {{adminToken}}" }
+            ],
+            "url": "{{baseUrl}}/catalog/admin/courses/{{courseId}}/moderate",
+            "body": { "mode": "raw", "raw": "{\n  \"action\": \"REJECT\",\n  \"note\": \"Can them bai giang\"\n}" }
+          }
+        },
+        {
+          "name": "Giang vien gui duyet lai -> PENDING",
+          "event": [{ "listen": "test", "script": { "exec": [
+            "pm.test('Trang thai PENDING', () => pm.expect(pm.response.json().data.status).to.eql('PENDING'));"
+          ] } }],
+          "request": {
+            "method": "PATCH",
+            "header": [{ "key": "Authorization", "value": "Bearer {{teacherToken}}" }],
+            "url": "{{baseUrl}}/catalog/courses/{{courseId}}/submit"
+          }
+        },
+        {
+          "name": "Admin phe duyet -> PUBLISHED",
+          "event": [{ "listen": "test", "script": { "exec": [
+            "pm.test('200 OK', () => pm.response.to.have.status(200));",
+            "const d = pm.response.json().data;",
+            "pm.test('Trang thai PUBLISHED', () => pm.expect(d.status).to.eql('PUBLISHED'));",
+            "pm.test('Co ngay phat hanh', () => pm.expect(d.publishedAt).to.not.eql(null));"
+          ] } }],
+          "request": {
+            "method": "PATCH",
+            "header": [
+              { "key": "Content-Type", "value": "application/json" },
+              { "key": "Authorization", "value": "Bearer {{adminToken}}" }
+            ],
+            "url": "{{baseUrl}}/catalog/admin/courses/{{courseId}}/moderate",
+            "body": { "mode": "raw", "raw": "{\n  \"action\": \"APPROVE\"\n}" }
+          }
+        },
+        {
+          "name": "Khach xem duoc khoa da duyet",
+          "event": [{ "listen": "test", "script": { "exec": [
+            "pm.test('200 OK', () => pm.response.to.have.status(200));"
+          ] } }],
+          "request": { "method": "GET", "url": "{{baseUrl}}/catalog/courses/{{courseSlug}}" }
+        },
+        {
+          "name": "Tim thay khoa moi trong ket qua tim kiem",
+          "event": [{ "listen": "test", "script": { "exec": [
+            "const id = Number(pm.collectionVariables.get('courseId'));",
+            "pm.test('Co khoa vua duyet', () => pm.expect(pm.response.json().data.map(c => c.id)).to.include(id));"
+          ] } }],
+          "request": { "method": "GET", "url": "{{baseUrl}}/catalog/courses?keyword={{courseTitle}}" }
+        },
+        {
+          "name": "[Loi] Gui duyet khoa da phat hanh -> 409",
+          "event": [{ "listen": "test", "script": { "exec": [
+            "pm.test('409 Conflict', () => pm.response.to.have.status(409));"
+          ] } }],
+          "request": {
+            "method": "PATCH",
+            "header": [{ "key": "Authorization", "value": "Bearer {{teacherToken}}" }],
+            "url": "{{baseUrl}}/catalog/courses/{{courseId}}/submit"
+          }
+        },
+        {
+          "name": "Thong ke khoa hoc cho admin",
+          "event": [{ "listen": "test", "script": { "exec": [
+            "pm.test('200 OK', () => pm.response.to.have.status(200));",
+            "pm.test('Co so khoa PUBLISHED', () => pm.expect(pm.response.json().data.published).to.be.above(0));"
+          ] } }],
+          "request": {
+            "method": "GET",
+            "header": [{ "key": "Authorization", "value": "Bearer {{adminToken}}" }],
+            "url": "{{baseUrl}}/catalog/admin/stats"
+          }
+        }
+      ]
+    },
+    {
+      "name": "05 - Don dep",
+      "item": [
+        {
+          "name": "Xoa bai giang",
+          "event": [{ "listen": "test", "script": { "exec": [
+            "pm.test('200 OK', () => pm.response.to.have.status(200));"
+          ] } }],
+          "request": {
+            "method": "DELETE",
+            "header": [{ "key": "Authorization", "value": "Bearer {{teacherToken}}" }],
+            "url": "{{baseUrl}}/content/lectures/{{lectureId}}"
+          }
+        },
+        {
+          "name": "Admin go khoa (UNPUBLISH -> DRAFT)",
+          "event": [{ "listen": "test", "script": { "exec": [
+            "pm.test('Trang thai DRAFT', () => pm.expect(pm.response.json().data.status).to.eql('DRAFT'));"
+          ] } }],
+          "request": {
+            "method": "PATCH",
+            "header": [
+              { "key": "Content-Type", "value": "application/json" },
+              { "key": "Authorization", "value": "Bearer {{adminToken}}" }
+            ],
+            "url": "{{baseUrl}}/catalog/admin/courses/{{courseId}}/moderate",
+            "body": { "mode": "raw", "raw": "{\n  \"action\": \"UNPUBLISH\"\n}" }
+          }
+        },
+        {
+          "name": "Giang vien xoa khoa hoc",
+          "event": [{ "listen": "test", "script": { "exec": [
+            "pm.test('200 OK', () => pm.response.to.have.status(200));"
+          ] } }],
+          "request": {
+            "method": "DELETE",
+            "header": [{ "key": "Authorization", "value": "Bearer {{teacherToken}}" }],
+            "url": "{{baseUrl}}/catalog/courses/{{courseId}}"
+          }
+        }
+      ]
+    }
+  ]
+}

@@ -45,6 +45,17 @@ public final class AuthDtos {
     public record RefreshRequest(String refreshToken) {
     }
 
+    public record ForgotPasswordRequest(
+            @NotBlank(message = "Email khong duoc de trong")
+            @Email(message = "Email khong dung dinh dang") String email) {
+    }
+
+    public record ResetPasswordRequest(
+            @NotBlank(message = "Thieu ma dat lai mat khau") String token,
+            @NotBlank(message = "Mat khau moi khong duoc de trong")
+            @Size(min = 6, max = 72, message = "Mat khau moi tu 6 den 72 ky tu") String newPassword) {
+    }
+
     /** Tra ve cho Frontend sau khi dang nhap/dang ky/refresh thanh cong. */
     public record TokenResponse(
             Long userId,

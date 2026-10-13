@@ -47,8 +47,11 @@ public class PaymentController {
 
     @GetMapping("/payment/momo/return")
     public void returned(HttpServletRequest request, HttpServletResponse response) throws IOException {
-        String status = safeFinish(fromRequest(request, null));
-        String target = webResultUrl + "?status=" + URLEncoder.encode(status, StandardCharsets.UTF_8);
+        Map<String, String> payload = fromRequest(request, null);
+        String status = safeFinish(payload);
+        String orderId = payload.getOrDefault("extraData", "");
+        String target = webResultUrl + "?status=" + URLEncoder.encode(status, StandardCharsets.UTF_8)
+                + "&orderId=" + URLEncoder.encode(orderId, StandardCharsets.UTF_8);
         response.sendRedirect(target);
     }
 

@@ -11,20 +11,25 @@ import org.springframework.core.annotation.Order;
 import org.springframework.http.MediaType;
 import org.springframework.stereotype.Component;
 import org.springframework.web.filter.OncePerRequestFilter;
+import org.springframework.web.util.ContentCachingResponseWrapper;
 
 import java.io.BufferedReader;
 import java.io.ByteArrayInputStream;
 import java.io.IOException;
 import java.io.InputStreamReader;
 import java.nio.charset.StandardCharsets;
+import java.security.KeyPair;
 import java.util.Arrays;
+import java.util.Collections;
+import java.util.Enumeration;
 import java.util.Set;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.stream.Collectors;
 
 /**
  * Chỉ bật trên service khai báo bank.link.protect.
- * Từ chối request thiếu chữ ký, quá hạn hoặc dùng lại nonce.
+ * Từ chối request thiếu chữ ký, quá hạn, dùng lại nonce hoặc không mã hóa.
+ * Gói tin được giải mã trước khi vào controller, câu trả lời được mã hóa bằng khóa của cùng phiên.
  */
 @Component
 @Order(Ordered.HIGHEST_PRECEDENCE + 30)
@@ -32,6 +37,10 @@ public class BankLinkGuard extends OncePerRequestFilter {
 
     private static final long MAX_SKEW_MS = 300_000;
     private final ConcurrentHashMap<String, Long> nonces = new ConcurrentHashMap<>();
+    private volatile Identity identity;
+
+    private record Identity(KeyPair keys, String publicKey, String keyId) {
+    }
 
     @Value("${bank.link.protect:}")
     private String protect;
@@ -50,6 +59,10 @@ public class BankLinkGuard extends OncePerRequestFilter {
             return;
         }
         String uri = request.getRequestURI();
+        if (BankCipher.HANDSHAKE.equals(uri) && "GET".equals(request.getMethod())) {
+            handshake(response);
+            return;
+        }
         boolean hit = Arrays.stream(protect.split(","))
                 .map(String::trim)
                 .filter(s -> !s.isEmpty())
@@ -92,7 +105,58 @@ public class BankLinkGuard extends OncePerRequestFilter {
             reject(response, "Chu ky thanh toan khong hop le");
             return;
         }
-        chain.doFilter(new CachedBodyRequest(request, body), response);
+
+        Identity own = identity();
+        BankCipher.Session session;
+        byte[] plain;
+        try {
+            BankCipher.Envelope envelope = BankCipher.Envelope.parse(body);
+            if (!own.keyId().equals(envelope.kid())) {
+                reject(response, "Khoa phien da doi, can bat tay lai");
+                return;
+            }
+            session = BankCipher.accept(own.keys(), envelope.epk());
+            plain = session.openRequest(envelope, request.getMethod() + " " + uri);
+        } catch (IllegalArgumentException ex) {
+            reject(response, "Goi tin thanh toan phai duoc ma hoa");
+            return;
+        }
+
+        ContentCachingResponseWrapper captured = new ContentCachingResponseWrapper(response);
+        chain.doFilter(new CachedBodyRequest(request, plain), captured);
+        if (response.isCommitted()) {
+            return;
+        }
+        byte[] sealed = session.sealResponse(captured.getContentAsByteArray(), "response " + uri).toJson();
+        response.setHeader(BankCipher.HEADER, BankCipher.SCHEME);
+        response.setContentType(MediaType.APPLICATION_JSON_VALUE);
+        response.setContentLength(sealed.length);
+        response.getOutputStream().write(sealed);
+    }
+
+    private void handshake(HttpServletResponse response) throws IOException {
+        Identity own = identity();
+        String signature = BankLink.signHandshake(secret, own.keyId(), own.publicKey());
+        byte[] json = new BankCipher.Handshake(own.keyId(), own.publicKey(), signature).toJson();
+        response.setStatus(200);
+        response.setContentType(MediaType.APPLICATION_JSON_VALUE);
+        response.setContentLength(json.length);
+        response.getOutputStream().write(json);
+    }
+
+    private Identity identity() {
+        Identity current = identity;
+        if (current == null) {
+            synchronized (this) {
+                if (identity == null) {
+                    KeyPair keys = BankCipher.newKeyPair();
+                    String publicKey = BankCipher.publicKey(keys);
+                    identity = new Identity(keys, publicKey, BankCipher.keyId(publicKey));
+                }
+                current = identity;
+            }
+        }
+        return current;
     }
 
     private void reject(HttpServletResponse response, String message) throws IOException {
@@ -138,6 +202,28 @@ public class BankLinkGuard extends OncePerRequestFilter {
         @Override
         public BufferedReader getReader() {
             return new BufferedReader(new InputStreamReader(getInputStream(), StandardCharsets.UTF_8));
+        }
+
+        @Override
+        public int getContentLength() {
+            return body.length;
+        }
+
+        @Override
+        public long getContentLengthLong() {
+            return body.length;
+        }
+
+        @Override
+        public String getHeader(String name) {
+            return "Content-Length".equalsIgnoreCase(name) ? String.valueOf(body.length) : super.getHeader(name);
+        }
+
+        @Override
+        public Enumeration<String> getHeaders(String name) {
+            return "Content-Length".equalsIgnoreCase(name)
+                    ? Collections.enumeration(Set.of(String.valueOf(body.length)))
+                    : super.getHeaders(name);
         }
     }
 }

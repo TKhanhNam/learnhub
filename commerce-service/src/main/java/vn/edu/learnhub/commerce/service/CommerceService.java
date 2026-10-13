@@ -175,12 +175,35 @@ public class CommerceService {
         }
 
         long amount = total.setScale(0, RoundingMode.HALF_UP).longValue();
-        if (amount <= 0) {
+        String method = request == null || request.paymentMethod() == null
+                ? "cod" : request.paymentMethod().trim().toLowerCase();
+        if (!"cod".equals(method) && !"momo".equals(method)) {
+            throw BusinessException.badRequest("Chon thanh toan thuong hoac MoMo");
+        }
+        if (amount <= 0 || "cod".equals(method)) {
             fulfill(order, source);
             return new CommerceDtos.CheckoutResult(toDto(order), null);
         }
-        String info = "LearnHub #" + order.getId();
+        String info = "Thanh toan don hang #" + order.getId();
         String payUrl = paymentClient.createMomo(order.getId(), amount, info);
+        cartItemRepository.deleteByUserId(buyerId);
+        return new CommerceDtos.CheckoutResult(toDto(order), payUrl);
+    }
+
+    @Transactional
+    public CommerceDtos.CheckoutResult payMomoAgain(Long buyerId, Long orderId) {
+        Order order = orderRepository.findById(orderId)
+                .orElseThrow(() -> BusinessException.notFound("Khong tim thay don hang"));
+        if (!buyerId.equals(order.getBuyerId())) {
+            throw BusinessException.forbidden("Khong phai don cua ban");
+        }
+        if (Order.PAID.equals(order.getStatus())) {
+            throw BusinessException.badRequest("Don hang da thanh toan");
+        }
+        order.setStatus(Order.PENDING);
+        orderRepository.save(order);
+        long amount = nvl(order.getTotal()).setScale(0, RoundingMode.HALF_UP).longValue();
+        String payUrl = paymentClient.createMomo(order.getId(), amount, "Thanh toan lai don hang #" + order.getId());
         return new CommerceDtos.CheckoutResult(toDto(order), payUrl);
     }
 

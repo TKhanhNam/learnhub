@@ -111,18 +111,26 @@ export default function CourseBookshelf() {
   useEffect(() => {
     const onMsg = (e: MessageEvent) => {
       if (!e.data || e.data.type !== 'learnhub-shelf-select') return
-      const course = courses.find((c) => c.slug === e.data.slug || c.id === e.data.courseId) || null
-      if (!course) return
-      setFocus((prev) => {
-        if (!prev || prev.id !== course.id) {
-          recordCourseClick(course)
-          setPicked((p) => (p.includes(course.id) ? p : [...p, course.id]))
-        }
-        return course
-      })
-      if (e.data.openToc === true) setTocOpen(true)
+      const courseId = Number(e.data.courseId)
+      const course = courses.find((c) => c.slug === e.data.slug || c.id === courseId) || null
+      if (course) {
+        setFocus((prev) => {
+          if (!prev || prev.id !== course.id) {
+            recordCourseClick(course)
+            setPicked((p) => (p.includes(course.id) ? p : [...p, course.id]))
+          }
+          return course
+        })
+      }
+      if (e.data.openToc === true && course) setTocOpen(true)
       if (e.data.checkout === true) {
-        void goToCheckout(course)
+        const target = course || (Number.isFinite(courseId) ? {
+          id: courseId,
+          slug: String(e.data.slug || ''),
+          title: String(e.data.title || 'Khóa học'),
+          price: Number(e.data.price) || 0,
+        } : null)
+        if (target) void goToCheckout(target)
       }
     }
     window.addEventListener('message', onMsg)
@@ -153,11 +161,12 @@ export default function CourseBookshelf() {
     setToast(null)
     try {
       await axiosClient.post('/api/commerce/cart', { courseId: course.id })
-      navigate('/cart')
     } catch (err: unknown) {
       const msg = (err as { response?: { data?: { message?: string } } })?.response?.data?.message
-      setToast(msg || 'Không chuyển được sang thanh toán.')
+      setToast(msg || 'Không thêm được vào giỏ. Vẫn mở trang thanh toán.')
+    } finally {
       setBusy(false)
+      navigate('/cart')
     }
   }
 
@@ -190,7 +199,7 @@ export default function CourseBookshelf() {
     <section className="course-shelf">
       <div className="course-shelf-head">
         <p className="hero-kicker">Thư viện 3D · Top {HOT_COURSE_LIMIT} truy cập nhiều nhất</p>
-        <h2>Mỗi khóa học là một quyển sách</h2>
+        <h2>Những khóa học được xem nhiều nhất</h2>
       </div>
 
       <div className="shader-frame course-shelf-frame">
@@ -198,7 +207,7 @@ export default function CourseBookshelf() {
           <iframe
             key={books.map((b) => b.id).join('|')}
             title="Thư viện LearnHub 3D"
-            src={`/landing-pages/complete-shelf-v2.html?courses=${books.length}&v=title`}
+            src={`/landing-pages/complete-shelf-v2.html?courses=${books.length}&v=popular`}
             allow="fullscreen"
             loading="eager"
             style={{ position: 'absolute', inset: 0, width: '100%', height: '100%', border: 0, background: '#080808' }}
@@ -209,10 +218,8 @@ export default function CourseBookshelf() {
       </div>
 
       <div className="course-shelf-actions">
-        <button type="button" onClick={() => focus && setTocOpen(true)} disabled={!focus}>
-          {focus ? `Mục lục · ${focus.title}` : 'Chọn một quyển trên kệ'}
-        </button>
         <Link to="/courses"><button type="button" className="ghost">Danh sách khóa học</button></Link>
+        {toast && <p className={toast.includes('Đã thêm') || toast.includes('Đang') ? 'ok' : 'err'}>{toast}</p>}
       </div>
 
       {tocOpen && focus && (

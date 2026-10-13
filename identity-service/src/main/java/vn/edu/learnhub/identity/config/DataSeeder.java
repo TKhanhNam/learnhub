@@ -31,25 +31,26 @@ public class DataSeeder implements ApplicationRunner {
 
     @Override
     public void run(ApplicationArguments args) {
-        if (userRepository.count() > 0) {
-            return;
-        }
-
-        create("admin", "admin@learnhub.vn", "Quan tri LearnHub", "admin123", Roles.ADMIN, null);
-        create("teacher1", "teacher1@learnhub.vn", "Nguyen Van Giang", "teacher123", Roles.INSTRUCTOR,
+        int created = 0;
+        created += ensure("admin", "admin@learnhub.vn", "Quan tri LearnHub", "admin123", Roles.ADMIN, null);
+        created += ensure("teacher1", "teacher1@learnhub.vn", "Nguyen Van Giang", "teacher123", Roles.INSTRUCTOR,
                 "Giang vien Java & Spring Boot");
-        create("teacher2", "teacher2@learnhub.vn", "Tran Thi Thiet Ke", "teacher123", Roles.INSTRUCTOR,
+        created += ensure("teacher2", "teacher2@learnhub.vn", "Tran Thi Thiet Ke", "teacher123", Roles.INSTRUCTOR,
                 "Giang vien UI/UX va Figma");
-        create("student1", "student1@learnhub.vn", "Le Van Hoc", "student123", Roles.STUDENT, null);
-        create("student2", "student2@learnhub.vn", "Pham Thi Sinh Vien", "student123", Roles.STUDENT, null);
-        create("orgadmin", "hr@fpt-demo.vn", "Quan tri FPT Demo", "org12345", Roles.ORG_ADMIN,
+        created += ensure("student1", "student1@learnhub.vn", "Le Van Hoc", "student123", Roles.STUDENT, null);
+        created += ensure("student2", "student2@learnhub.vn", "Pham Thi Sinh Vien", "student123", Roles.STUDENT, null);
+        created += ensure("orgadmin", "hr@fpt-demo.vn", "Quan tri FPT Demo", "org12345", Roles.ORG_ADMIN,
                 "Phu trach L&D cua doanh nghiep");
-
-        log.info("Da tao 6 tai khoan demo cho identity_db");
+        if (created > 0) {
+            log.info("Da tao {} tai khoan demo cho identity_db", created);
+        }
     }
 
-    private void create(String username, String email, String fullName,
-                        String rawPassword, String role, String headline) {
+    private int ensure(String username, String email, String fullName,
+                       String rawPassword, String role, String headline) {
+        if (userRepository.existsByUsernameIgnoreCase(username) || userRepository.existsByEmailIgnoreCase(email)) {
+            return 0;
+        }
         AppUser user = new AppUser();
         user.setUsername(username);
         user.setEmail(email);
@@ -58,6 +59,8 @@ public class DataSeeder implements ApplicationRunner {
         user.setRole(role);
         user.setHeadline(headline);
         user.setCreatedAt(Instant.now());
+        user.setEmailVerifiedAt(Instant.now());
         userRepository.save(user);
+        return 1;
     }
 }

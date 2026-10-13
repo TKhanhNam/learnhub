@@ -20,10 +20,15 @@ const axiosClient = axios.create({
   headers: { 'Content-Type': 'application/json' },
 })
 
+function isPublicAuth(url?: string) {
+  const path = url || ''
+  return /\/auth\/(login|register|verify-email|forgot-password|reset-password)(\?|$)/.test(path)
+}
+
 axiosClient.interceptors.request.use((config) => {
   config.baseURL = apiOrigin()
   const token = localStorage.getItem('lh_token')
-  if (token) {
+  if (token && !isPublicAuth(String(config.url || ''))) {
     config.headers.Authorization = `Bearer ${token}`
   }
   return config

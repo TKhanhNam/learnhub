@@ -23,11 +23,27 @@ public final class BankLink {
 
     public static String sign(String secret, String clientId, String timestamp, String nonce,
                               String method, String path, byte[] body) {
-        String canonical = canonical(clientId, timestamp, nonce, method, path, body);
+        return hmac(secret, canonical(clientId, timestamp, nonce, method, path, body));
+    }
+
+    public static String signHandshake(String secret, String keyId, String publicKey) {
+        return hmac(secret, "dh-handshake\n" + keyId + "\n" + publicKey);
+    }
+
+    public static boolean handshakeMatches(String secret, String keyId, String publicKey, String presented) {
+        if (keyId == null || publicKey == null || presented == null || presented.isBlank()) {
+            return false;
+        }
+        return MessageDigest.isEqual(
+                signHandshake(secret, keyId, publicKey).getBytes(StandardCharsets.UTF_8),
+                presented.getBytes(StandardCharsets.UTF_8));
+    }
+
+    private static String hmac(String secret, String text) {
         try {
             Mac mac = Mac.getInstance("HmacSHA256");
             mac.init(new SecretKeySpec(secret.getBytes(StandardCharsets.UTF_8), "HmacSHA256"));
-            return HexFormat.of().formatHex(mac.doFinal(canonical.getBytes(StandardCharsets.UTF_8)));
+            return HexFormat.of().formatHex(mac.doFinal(text.getBytes(StandardCharsets.UTF_8)));
         } catch (Exception ex) {
             throw new IllegalStateException("Khong ky duoc thong diep thanh toan", ex);
         }

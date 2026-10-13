@@ -16,7 +16,8 @@ public final class CommerceDtos {
 
     public record CartDTO(List<CartItemDTO> items, BigDecimal subtotal) {}
 
-    public record CheckoutRequest(String couponCode, boolean gift, Long recipientUserId, String recipientEmail) {}
+    public record CheckoutRequest(String couponCode, boolean gift, Long recipientUserId, String recipientEmail,
+                                  String paymentMethod) {}
 
     public record CheckoutResult(OrderDTO order, String payUrl) {}
 

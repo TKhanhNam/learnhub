@@ -1,0 +1,749 @@
+{
+  "info": {
+    "name": "LearnHub - Nguoi 1 - Cong vao, tai khoan va to chuc",
+    "description": "Kich ban test api-gateway, identity-service (identity_db) va org-service qua API Gateway cong 8080. Chay theo thu tu tu tren xuong (Run collection). Can chay: identity-service 8081, org-service 8087, api-gateway 8080; request 'Cap khoa hoc' can them learning-service 8083.",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+  },
+  "variable": [
+    { "key": "baseUrl", "value": "http://localhost:8080/api" },
+    { "key": "courseId", "value": "1" },
+    { "key": "adminToken", "value": "" },
+    { "key": "studentToken", "value": "" },
+    { "key": "orgToken", "value": "" },
+    { "key": "newUser", "value": "" },
+    { "key": "newUserId", "value": "" },
+    { "key": "newToken", "value": "" },
+    { "key": "newRefresh", "value": "" },
+    { "key": "oldRefresh", "value": "" },
+    { "key": "rotatedRefresh", "value": "" },
+    { "key": "verifyToken", "value": "" },
+    { "key": "orgId", "value": "" }
+  ],
+  "item": [
+    {
+      "name": "01 - API Gateway",
+      "item": [
+        {
+          "name": "Goi API can dang nhap ma khong co token -> 401",
+          "event": [{ "listen": "test", "script": { "exec": [
+            "pm.test('401 Unauthorized', () => pm.response.to.have.status(401));",
+            "pm.test('Gateway tra envelope loi', () => pm.expect(pm.response.json().success).to.eql(false));"
+          ] } }],
+          "request": { "method": "GET", "url": "{{baseUrl}}/users/me" }
+        },
+        {
+          "name": "Goi duong dan /internal/ tu ngoai -> 403",
+          "event": [{ "listen": "test", "script": { "exec": [
+            "pm.test('403 Forbidden', () => pm.response.to.have.status(403));"
+          ] } }],
+          "request": { "method": "GET", "url": "{{baseUrl}}/users/internal/abc" }
+        },
+        {
+          "name": "Route public GET /org/plans khong can token -> 200",
+          "event": [{ "listen": "test", "script": { "exec": [
+            "pm.test('200 OK', () => pm.response.to.have.status(200));",
+            "pm.test('Co 3 goi', () => pm.expect(pm.response.json().data.length).to.eql(3));",
+            "pm.test('Co header X-Trace-Id', () => pm.response.to.have.header('X-Trace-Id'));"
+          ] } }],
+          "request": { "method": "GET", "url": "{{baseUrl}}/org/plans" }
+        }
+      ]
+    },
+    {
+      "name": "02 - Use case Dang ky",
+      "item": [
+        {
+          "name": "Dang ky tai khoan hoc vien moi -> 201",
+          "event": [
+            { "listen": "prerequest", "script": { "exec": [
+              "pm.collectionVariables.set('newUser', 'tester' + Date.now());"
+            ] } },
+            { "listen": "test", "script": { "exec": [
+              "pm.test('201 Created', () => pm.response.to.have.status(201));",
+              "const d = pm.response.json().data;",
+              "pm.test('Role mac dinh STUDENT', () => pm.expect(d.role).to.eql('STUDENT'));",
+              "pm.test('Co access + refresh token', () => { pm.expect(d.accessToken).to.be.a('string'); pm.expect(d.refreshToken).to.be.a('string'); });",
+              "pm.test('Email chua xac thuc', () => pm.expect(d.emailVerified).to.eql(false));",
+              "pm.test('Refresh token dat trong cookie HttpOnly', () => pm.expect(pm.response.headers.get('Set-Cookie') || '').to.include('HttpOnly'));",
+              "pm.collectionVariables.set('newUserId', d.userId);",
+              "pm.collectionVariables.set('newToken', d.accessToken);",
+              "pm.collectionVariables.set('newRefresh', d.refreshToken);",
+              "if (d.devVerifyUrl) { pm.collectionVariables.set('verifyToken', d.devVerifyUrl.split('token=')[1]); }"
+            ] } }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "url": "{{baseUrl}}/auth/register",
+            "body": { "mode": "raw", "raw": "{\n  \"username\": \"{{newUser}}\",\n  \"email\": \"{{newUser}}@test.vn\",\n  \"fullName\": \"Nguoi Test\",\n  \"password\": \"test123\",\n  \"role\": \"STUDENT\"\n}" }
+          }
+        },
+        {
+          "name": "Dang ky trung username -> 409",
+          "event": [{ "listen": "test", "script": { "exec": [
+            "pm.test('409 Conflict', () => pm.response.to.have.status(409));"
+          ] } }],
+          "request": {
+            "method": "POST",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "url": "{{baseUrl}}/auth/register",
+            "body": { "mode": "raw", "raw": "{\n  \"username\": \"{{newUser}}\",\n  \"email\": \"khac{{newUser}}@test.vn\",\n  \"fullName\": \"Trung ten\",\n  \"password\": \"test123\"\n}" }
+          }
+        },
+        {
+          "name": "Dang ky trung email -> 409",
+          "event": [{ "listen": "test", "script": { "exec": [
+            "pm.test('409 Conflict', () => pm.response.to.have.status(409));"
+          ] } }],
+          "request": {
+            "method": "POST",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "url": "{{baseUrl}}/auth/register",
+            "body": { "mode": "raw", "raw": "{\n  \"username\": \"khac{{newUser}}\",\n  \"email\": \"{{newUser}}@test.vn\",\n  \"fullName\": \"Trung email\",\n  \"password\": \"test123\"\n}" }
+          }
+        },
+        {
+          "name": "Dang ky sai email + mat khau ngan -> 400",
+          "event": [{ "listen": "test", "script": { "exec": [
+            "pm.test('400 Bad Request', () => pm.response.to.have.status(400));",
+            "pm.test('Co danh sach loi validate', () => pm.expect(pm.response.json().errors).to.be.an('array').that.is.not.empty);"
+          ] } }],
+          "request": {
+            "method": "POST",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "url": "{{baseUrl}}/auth/register",
+            "body": { "mode": "raw", "raw": "{\n  \"username\": \"a\",\n  \"email\": \"khong-phai-email\",\n  \"fullName\": \"\",\n  \"password\": \"1\"\n}" }
+          }
+        },
+        {
+          "name": "Tu dang ky vai tro ADMIN -> 400",
+          "event": [{ "listen": "test", "script": { "exec": [
+            "pm.test('400 Bad Request', () => pm.response.to.have.status(400));"
+          ] } }],
+          "request": {
+            "method": "POST",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "url": "{{baseUrl}}/auth/register",
+            "body": { "mode": "raw", "raw": "{\n  \"username\": \"hack{{newUser}}\",\n  \"email\": \"hack{{newUser}}@test.vn\",\n  \"fullName\": \"Hacker\",\n  \"password\": \"test123\",\n  \"role\": \"ADMIN\"\n}" }
+          }
+        }
+      ]
+    },
+    {
+      "name": "03 - Use case Dang nhap & JWT",
+      "item": [
+        {
+          "name": "Dang nhap sai mat khau -> 401",
+          "event": [{ "listen": "test", "script": { "exec": [
+            "pm.test('401 Unauthorized', () => pm.response.to.have.status(401));"
+          ] } }],
+          "request": {
+            "method": "POST",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "url": "{{baseUrl}}/auth/login",
+            "body": { "mode": "raw", "raw": "{\n  \"username\": \"student1\",\n  \"password\": \"sai-mat-khau\",\n  \"human\": true\n}" }
+          }
+        },
+        {
+          "name": "Dang nhap khong xac nhan 'Toi la nguoi' -> 400",
+          "event": [{ "listen": "test", "script": { "exec": [
+            "pm.test('400 Bad Request', () => pm.response.to.have.status(400));"
+          ] } }],
+          "request": {
+            "method": "POST",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "url": "{{baseUrl}}/auth/login",
+            "body": { "mode": "raw", "raw": "{\n  \"username\": \"student1\",\n  \"password\": \"student123\"\n}" }
+          }
+        },
+        {
+          "name": "Dang nhap hoc vien student1 -> 200",
+          "event": [{ "listen": "test", "script": { "exec": [
+            "pm.test('200 OK', () => pm.response.to.have.status(200));",
+            "const d = pm.response.json().data;",
+            "pm.test('Role la STUDENT', () => pm.expect(d.role).to.eql('STUDENT'));",
+            "pm.test('Access token la JWT 3 phan', () => pm.expect(d.accessToken.split('.').length).to.eql(3));",
+            "pm.collectionVariables.set('studentToken', d.accessToken);",
+            "pm.collectionVariables.set('oldRefresh', d.refreshToken);"
+          ] } }],
+          "request": {
+            "method": "POST",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "url": "{{baseUrl}}/auth/login",
+            "body": { "mode": "raw", "raw": "{\n  \"username\": \"student1\",\n  \"password\": \"student123\",\n  \"human\": true\n}" }
+          }
+        },
+        {
+          "name": "Dang nhap bang email thay username -> 200",
+          "event": [{ "listen": "test", "script": { "exec": [
+            "pm.test('200 OK', () => pm.response.to.have.status(200));"
+          ] } }],
+          "request": {
+            "method": "POST",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "url": "{{baseUrl}}/auth/login",
+            "body": { "mode": "raw", "raw": "{\n  \"username\": \"student1@learnhub.vn\",\n  \"password\": \"student123\",\n  \"human\": true\n}" }
+          }
+        },
+        {
+          "name": "Lay thong tin ca nhan bang JWT -> 200",
+          "event": [{ "listen": "test", "script": { "exec": [
+            "pm.test('200 OK', () => pm.response.to.have.status(200));",
+            "const d = pm.response.json().data;",
+            "pm.test('Dung tai khoan student1', () => pm.expect(d.username).to.eql('student1'));",
+            "pm.test('Khong lo password hash', () => pm.expect(d).to.not.have.property('passwordHash'));"
+          ] } }],
+          "request": {
+            "method": "GET",
+            "header": [{ "key": "Authorization", "value": "Bearer {{studentToken}}" }],
+            "url": "{{baseUrl}}/users/me"
+          }
+        },
+        {
+          "name": "Token gia mao -> 401",
+          "event": [{ "listen": "test", "script": { "exec": [
+            "pm.test('401 Unauthorized', () => pm.response.to.have.status(401));"
+          ] } }],
+          "request": {
+            "method": "GET",
+            "header": [{ "key": "Authorization", "value": "Bearer abc.def.ghi" }],
+            "url": "{{baseUrl}}/users/me"
+          }
+        },
+        {
+          "name": "STUDENT goi API ADMIN -> 403",
+          "event": [{ "listen": "test", "script": { "exec": [
+            "pm.test('403 Forbidden', () => pm.response.to.have.status(403));"
+          ] } }],
+          "request": {
+            "method": "GET",
+            "header": [{ "key": "Authorization", "value": "Bearer {{studentToken}}" }],
+            "url": "{{baseUrl}}/users/admin/stats"
+          }
+        },
+        {
+          "name": "Refresh token cap token moi -> 200",
+          "event": [{ "listen": "test", "script": { "exec": [
+            "pm.test('200 OK', () => pm.response.to.have.status(200));",
+            "const d = pm.response.json().data;",
+            "pm.test('Refresh token moi khac token cu', () => pm.expect(d.refreshToken).to.not.eql(pm.collectionVariables.get('oldRefresh')));",
+            "pm.collectionVariables.set('rotatedRefresh', d.refreshToken);"
+          ] } }],
+          "request": {
+            "method": "POST",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "url": "{{baseUrl}}/auth/refresh",
+            "body": { "mode": "raw", "raw": "{\n  \"refreshToken\": \"{{oldRefresh}}\"\n}" }
+          }
+        },
+        {
+          "name": "Dung lai refresh token cu (da xoay vong) -> 401",
+          "event": [{ "listen": "test", "script": { "exec": [
+            "pm.test('401 Unauthorized', () => pm.response.to.have.status(401));"
+          ] } }],
+          "request": {
+            "method": "POST",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "url": "{{baseUrl}}/auth/refresh",
+            "body": { "mode": "raw", "raw": "{\n  \"refreshToken\": \"{{oldRefresh}}\"\n}" }
+          }
+        },
+        {
+          "name": "Dang xuat -> 200",
+          "event": [{ "listen": "test", "script": { "exec": [
+            "pm.test('200 OK', () => pm.response.to.have.status(200));"
+          ] } }],
+          "request": {
+            "method": "POST",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "url": "{{baseUrl}}/auth/logout",
+            "body": { "mode": "raw", "raw": "{\n  \"refreshToken\": \"{{rotatedRefresh}}\"\n}" }
+          }
+        },
+        {
+          "name": "Refresh sau khi dang xuat -> 401",
+          "event": [{ "listen": "test", "script": { "exec": [
+            "pm.test('401 Unauthorized', () => pm.response.to.have.status(401));"
+          ] } }],
+          "request": {
+            "method": "POST",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "url": "{{baseUrl}}/auth/refresh",
+            "body": { "mode": "raw", "raw": "{\n  \"refreshToken\": \"{{rotatedRefresh}}\"\n}" }
+          }
+        }
+      ]
+    },
+    {
+      "name": "04 - Use case Xac thuc email",
+      "item": [
+        {
+          "name": "Dang nhap admin -> 200",
+          "event": [{ "listen": "test", "script": { "exec": [
+            "pm.test('200 OK', () => pm.response.to.have.status(200));",
+            "const d = pm.response.json().data;",
+            "pm.test('Role la ADMIN', () => pm.expect(d.role).to.eql('ADMIN'));",
+            "pm.collectionVariables.set('adminToken', d.accessToken);"
+          ] } }],
+          "request": {
+            "method": "POST",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "url": "{{baseUrl}}/auth/login",
+            "body": { "mode": "raw", "raw": "{\n  \"username\": \"admin\",\n  \"password\": \"admin123\",\n  \"human\": true\n}" }
+          }
+        },
+        {
+          "name": "Admin xem nhat ky mail (lay link xac thuc) -> 200",
+          "event": [{ "listen": "test", "script": { "exec": [
+            "pm.test('200 OK', () => pm.response.to.have.status(200));",
+            "if (!pm.collectionVariables.get('verifyToken')) {",
+            "  const uid = Number(pm.collectionVariables.get('newUserId'));",
+            "  const mail = pm.response.json().data.find(m => m.relatedUserId === uid && /verify-email\\?token=/.test(m.body || ''));",
+            "  if (mail) { pm.collectionVariables.set('verifyToken', mail.body.match(/verify-email\\?token=([^\\s\"<&]+)/)[1]); }",
+            "}",
+            "pm.test('Lay duoc token xac thuc email', () => pm.expect(pm.collectionVariables.get('verifyToken')).to.not.be.empty);"
+          ] } }],
+          "request": {
+            "method": "GET",
+            "header": [{ "key": "Authorization", "value": "Bearer {{adminToken}}" }],
+            "url": "{{baseUrl}}/users/admin/mail-log?size=30"
+          }
+        },
+        {
+          "name": "Xac thuc email bang token -> 200",
+          "event": [{ "listen": "test", "script": { "exec": [
+            "pm.test('200 OK', () => pm.response.to.have.status(200));"
+          ] } }],
+          "request": { "method": "GET", "url": "{{baseUrl}}/auth/verify-email?token={{verifyToken}}" }
+        },
+        {
+          "name": "Kiem tra emailVerified = true",
+          "event": [{ "listen": "test", "script": { "exec": [
+            "pm.test('200 OK', () => pm.response.to.have.status(200));",
+            "pm.test('emailVerified = true', () => pm.expect(pm.response.json().data.emailVerified).to.eql(true));"
+          ] } }],
+          "request": {
+            "method": "GET",
+            "header": [{ "key": "Authorization", "value": "Bearer {{newToken}}" }],
+            "url": "{{baseUrl}}/users/me"
+          }
+        },
+        {
+          "name": "Token xac thuc sai -> 400",
+          "event": [{ "listen": "test", "script": { "exec": [
+            "pm.test('400 Bad Request', () => pm.response.to.have.status(400));"
+          ] } }],
+          "request": { "method": "GET", "url": "{{baseUrl}}/auth/verify-email?token=token-sai" }
+        }
+      ]
+    },
+    {
+      "name": "05 - Use case Khoa tai khoan",
+      "item": [
+        {
+          "name": "STUDENT khong duoc khoa nguoi khac -> 403",
+          "event": [{ "listen": "test", "script": { "exec": [
+            "pm.test('403 Forbidden', () => pm.response.to.have.status(403));"
+          ] } }],
+          "request": {
+            "method": "PATCH",
+            "header": [
+              { "key": "Content-Type", "value": "application/json" },
+              { "key": "Authorization", "value": "Bearer {{studentToken}}" }
+            ],
+            "url": "{{baseUrl}}/users/{{newUserId}}/lock",
+            "body": { "mode": "raw", "raw": "{\n  \"locked\": true,\n  \"reason\": \"Thu khoa\"\n}" }
+          }
+        },
+        {
+          "name": "Admin khoa tai khoan kem ly do -> 200",
+          "event": [{ "listen": "test", "script": { "exec": [
+            "pm.test('200 OK', () => pm.response.to.have.status(200));",
+            "const d = pm.response.json().data;",
+            "pm.test('locked = true', () => pm.expect(d.locked).to.eql(true));",
+            "pm.test('Luu ly do khoa', () => pm.expect(d.lockReason).to.eql('Vi pham dieu khoan su dung'));"
+          ] } }],
+          "request": {
+            "method": "PATCH",
+            "header": [
+              { "key": "Content-Type", "value": "application/json" },
+              { "key": "Authorization", "value": "Bearer {{adminToken}}" }
+            ],
+            "url": "{{baseUrl}}/users/{{newUserId}}/lock",
+            "body": { "mode": "raw", "raw": "{\n  \"locked\": true,\n  \"reason\": \"Vi pham dieu khoan su dung\"\n}" }
+          }
+        },
+        {
+          "name": "Tai khoan bi khoa dang nhap -> 403",
+          "event": [{ "listen": "test", "script": { "exec": [
+            "pm.test('403 Forbidden', () => pm.response.to.have.status(403));",
+            "pm.test('Thong bao co ly do khoa', () => pm.expect(pm.response.json().message).to.include('Vi pham'));"
+          ] } }],
+          "request": {
+            "method": "POST",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "url": "{{baseUrl}}/auth/login",
+            "body": { "mode": "raw", "raw": "{\n  \"username\": \"{{newUser}}\",\n  \"password\": \"test123\",\n  \"human\": true\n}" }
+          }
+        },
+        {
+          "name": "Khoa xong refresh token cu bi thu hoi -> 401",
+          "event": [{ "listen": "test", "script": { "exec": [
+            "pm.test('401 Unauthorized', () => pm.response.to.have.status(401));"
+          ] } }],
+          "request": {
+            "method": "POST",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "url": "{{baseUrl}}/auth/refresh",
+            "body": { "mode": "raw", "raw": "{\n  \"refreshToken\": \"{{newRefresh}}\"\n}" }
+          }
+        },
+        {
+          "name": "Admin xem email thong bao khoa da gui",
+          "event": [{ "listen": "test", "script": { "exec": [
+            "pm.test('200 OK', () => pm.response.to.have.status(200));",
+            "const uid = Number(pm.collectionVariables.get('newUserId'));",
+            "pm.test('Co mail gui cho tai khoan bi khoa', () => pm.expect(pm.response.json().data.filter(m => m.relatedUserId === uid).length).to.be.above(1));"
+          ] } }],
+          "request": {
+            "method": "GET",
+            "header": [{ "key": "Authorization", "value": "Bearer {{adminToken}}" }],
+            "url": "{{baseUrl}}/users/admin/mail-log?size=30"
+          }
+        },
+        {
+          "name": "Admin mo khoa -> 200",
+          "event": [{ "listen": "test", "script": { "exec": [
+            "pm.test('200 OK', () => pm.response.to.have.status(200));",
+            "pm.test('locked = false', () => pm.expect(pm.response.json().data.locked).to.eql(false));"
+          ] } }],
+          "request": {
+            "method": "PATCH",
+            "header": [
+              { "key": "Content-Type", "value": "application/json" },
+              { "key": "Authorization", "value": "Bearer {{adminToken}}" }
+            ],
+            "url": "{{baseUrl}}/users/{{newUserId}}/lock",
+            "body": { "mode": "raw", "raw": "{\n  \"locked\": false\n}" }
+          }
+        },
+        {
+          "name": "Dang nhap lai sau khi mo khoa -> 200",
+          "event": [{ "listen": "test", "script": { "exec": [
+            "pm.test('200 OK', () => pm.response.to.have.status(200));",
+            "pm.collectionVariables.set('newToken', pm.response.json().data.accessToken);"
+          ] } }],
+          "request": {
+            "method": "POST",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "url": "{{baseUrl}}/auth/login",
+            "body": { "mode": "raw", "raw": "{\n  \"username\": \"{{newUser}}\",\n  \"password\": \"test123\",\n  \"human\": true\n}" }
+          }
+        }
+      ]
+    },
+    {
+      "name": "06 - Quan ly nguoi dung (ADMIN)",
+      "item": [
+        {
+          "name": "Tim kiem nguoi dung -> 200",
+          "event": [{ "listen": "test", "script": { "exec": [
+            "pm.test('200 OK', () => pm.response.to.have.status(200));",
+            "pm.test('Co meta phan trang', () => pm.expect(pm.response.json().meta).to.have.property('totalPages'));"
+          ] } }],
+          "request": {
+            "method": "GET",
+            "header": [{ "key": "Authorization", "value": "Bearer {{adminToken}}" }],
+            "url": "{{baseUrl}}/users?keyword=student&size=10"
+          }
+        },
+        {
+          "name": "Thong ke tai khoan -> 200",
+          "event": [{ "listen": "test", "script": { "exec": [
+            "pm.test('200 OK', () => pm.response.to.have.status(200));",
+            "pm.test('Co tong so user', () => pm.expect(pm.response.json().data.totalUsers).to.be.above(0));"
+          ] } }],
+          "request": {
+            "method": "GET",
+            "header": [{ "key": "Authorization", "value": "Bearer {{adminToken}}" }],
+            "url": "{{baseUrl}}/users/admin/stats"
+          }
+        },
+        {
+          "name": "Cap nhat ho so ca nhan -> 200",
+          "event": [{ "listen": "test", "script": { "exec": [
+            "pm.test('200 OK', () => pm.response.to.have.status(200));",
+            "pm.test('Ho ten da doi', () => pm.expect(pm.response.json().data.fullName).to.eql('Nguoi Test Da Sua'));"
+          ] } }],
+          "request": {
+            "method": "PUT",
+            "header": [
+              { "key": "Content-Type", "value": "application/json" },
+              { "key": "Authorization", "value": "Bearer {{newToken}}" }
+            ],
+            "url": "{{baseUrl}}/users/me",
+            "body": { "mode": "raw", "raw": "{\n  \"fullName\": \"Nguoi Test Da Sua\",\n  \"headline\": \"Hoc vien test\"\n}" }
+          }
+        }
+      ]
+    },
+    {
+      "name": "07 - org-service: Doanh nghiep dung thu",
+      "item": [
+        {
+          "name": "Gui yeu cau dung thu khong can dang nhap -> 201",
+          "event": [{ "listen": "test", "script": { "exec": [
+            "pm.test('200/201', () => pm.expect(pm.response.code).to.be.oneOf([200, 201]));",
+            "pm.test('code = 201', () => pm.expect(pm.response.json().code).to.eql(201));"
+          ] } }],
+          "request": {
+            "method": "POST",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "url": "{{baseUrl}}/org/demo-requests",
+            "body": { "mode": "raw", "raw": "{\n  \"company\": \"Cong ty Test\",\n  \"contactEmail\": \"hr@congtytest.vn\",\n  \"message\": \"Can goi cho 50 nhan su\"\n}" }
+          }
+        },
+        {
+          "name": "Yeu cau dung thu thieu email -> 400",
+          "event": [{ "listen": "test", "script": { "exec": [
+            "pm.test('400 Bad Request', () => pm.response.to.have.status(400));"
+          ] } }],
+          "request": {
+            "method": "POST",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "url": "{{baseUrl}}/org/demo-requests",
+            "body": { "mode": "raw", "raw": "{\n  \"company\": \"Thieu email\"\n}" }
+          }
+        },
+        {
+          "name": "Admin xem danh sach yeu cau dung thu -> 200",
+          "event": [{ "listen": "test", "script": { "exec": [
+            "pm.test('200 OK', () => pm.response.to.have.status(200));",
+            "pm.test('Co yeu cau vua gui', () => pm.expect(pm.response.json().data.some(d => d.company === 'Cong ty Test')).to.eql(true));"
+          ] } }],
+          "request": {
+            "method": "GET",
+            "header": [{ "key": "Authorization", "value": "Bearer {{adminToken}}" }],
+            "url": "{{baseUrl}}/org/admin/demo-requests"
+          }
+        }
+      ]
+    },
+    {
+      "name": "08 - org-service: Quan ly to chuc",
+      "item": [
+        {
+          "name": "Dang nhap quan tri to chuc orgadmin -> 200",
+          "event": [{ "listen": "test", "script": { "exec": [
+            "pm.test('200 OK', () => pm.response.to.have.status(200));",
+            "const d = pm.response.json().data;",
+            "pm.test('Role la ORG_ADMIN', () => pm.expect(d.role).to.eql('ORG_ADMIN'));",
+            "pm.collectionVariables.set('orgToken', d.accessToken);"
+          ] } }],
+          "request": {
+            "method": "POST",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "url": "{{baseUrl}}/auth/login",
+            "body": { "mode": "raw", "raw": "{\n  \"username\": \"orgadmin\",\n  \"password\": \"org12345\",\n  \"human\": true\n}" }
+          }
+        },
+        {
+          "name": "STUDENT goi API to chuc -> 403",
+          "event": [{ "listen": "test", "script": { "exec": [
+            "pm.test('403 Forbidden', () => pm.response.to.have.status(403));"
+          ] } }],
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Content-Type", "value": "application/json" },
+              { "key": "Authorization", "value": "Bearer {{studentToken}}" }
+            ],
+            "url": "{{baseUrl}}/org/organizations",
+            "body": { "mode": "raw", "raw": "{\n  \"name\": \"Hoc vien tao to chuc\"\n}" }
+          }
+        },
+        {
+          "name": "Tao to chuc goi BUSINESS -> 201",
+          "event": [{ "listen": "test", "script": { "exec": [
+            "pm.test('200/201', () => pm.expect(pm.response.code).to.be.oneOf([200, 201]));",
+            "const d = pm.response.json().data;",
+            "pm.test('Goi BUSINESS co 100 cho', () => pm.expect(d.seatLimit).to.eql(100));",
+            "pm.test('Chu to chuc la thanh vien dau tien', () => pm.expect(d.memberCount).to.eql(1));",
+            "pm.collectionVariables.set('orgId', d.id);"
+          ] } }],
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Content-Type", "value": "application/json" },
+              { "key": "Authorization", "value": "Bearer {{orgToken}}" }
+            ],
+            "url": "{{baseUrl}}/org/organizations",
+            "body": { "mode": "raw", "raw": "{\n  \"name\": \"FPT Demo {{newUser}}\",\n  \"plan\": \"BUSINESS\"\n}" }
+          }
+        },
+        {
+          "name": "Tao to chuc thieu ten -> 400",
+          "event": [{ "listen": "test", "script": { "exec": [
+            "pm.test('400 Bad Request', () => pm.response.to.have.status(400));"
+          ] } }],
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Content-Type", "value": "application/json" },
+              { "key": "Authorization", "value": "Bearer {{orgToken}}" }
+            ],
+            "url": "{{baseUrl}}/org/organizations",
+            "body": { "mode": "raw", "raw": "{\n  \"name\": \"\"\n}" }
+          }
+        },
+        {
+          "name": "Xem to chuc cua toi -> 200",
+          "event": [{ "listen": "test", "script": { "exec": [
+            "pm.test('200 OK', () => pm.response.to.have.status(200));"
+          ] } }],
+          "request": {
+            "method": "GET",
+            "header": [{ "key": "Authorization", "value": "Bearer {{orgToken}}" }],
+            "url": "{{baseUrl}}/org/organizations/me"
+          }
+        },
+        {
+          "name": "Them nhan su vao to chuc -> 201",
+          "event": [{ "listen": "test", "script": { "exec": [
+            "pm.test('200/201', () => pm.expect(pm.response.code).to.be.oneOf([200, 201]));",
+            "pm.test('Dung userId', () => pm.expect(pm.response.json().data.userId).to.eql(Number(pm.collectionVariables.get('newUserId'))));"
+          ] } }],
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Content-Type", "value": "application/json" },
+              { "key": "Authorization", "value": "Bearer {{orgToken}}" }
+            ],
+            "url": "{{baseUrl}}/org/organizations/{{orgId}}/members",
+            "body": { "mode": "raw", "raw": "{\n  \"userId\": {{newUserId}},\n  \"role\": \"LEARNER\"\n}" }
+          }
+        },
+        {
+          "name": "Them trung nhan su -> 409",
+          "event": [{ "listen": "test", "script": { "exec": [
+            "pm.test('409 Conflict', () => pm.response.to.have.status(409));"
+          ] } }],
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Content-Type", "value": "application/json" },
+              { "key": "Authorization", "value": "Bearer {{orgToken}}" }
+            ],
+            "url": "{{baseUrl}}/org/organizations/{{orgId}}/members",
+            "body": { "mode": "raw", "raw": "{\n  \"userId\": {{newUserId}}\n}" }
+          }
+        },
+        {
+          "name": "Danh sach nhan su -> 200",
+          "event": [{ "listen": "test", "script": { "exec": [
+            "pm.test('200 OK', () => pm.response.to.have.status(200));",
+            "pm.test('Co 2 thanh vien (chu + nhan su moi)', () => pm.expect(pm.response.json().data.length).to.eql(2));"
+          ] } }],
+          "request": {
+            "method": "GET",
+            "header": [{ "key": "Authorization", "value": "Bearer {{orgToken}}" }],
+            "url": "{{baseUrl}}/org/organizations/{{orgId}}/members"
+          }
+        },
+        {
+          "name": "Tao lo trinh hoc -> 201",
+          "event": [{ "listen": "test", "script": { "exec": [
+            "pm.test('200/201', () => pm.expect(pm.response.code).to.be.oneOf([200, 201]));",
+            "pm.test('Lo trinh chua khoa hoc', () => pm.expect(pm.response.json().data.courseIds.length).to.be.above(0));"
+          ] } }],
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Content-Type", "value": "application/json" },
+              { "key": "Authorization", "value": "Bearer {{orgToken}}" }
+            ],
+            "url": "{{baseUrl}}/org/organizations/{{orgId}}/paths",
+            "body": { "mode": "raw", "raw": "{\n  \"title\": \"Lo trinh Java cho nhan vien moi\",\n  \"courseIds\": [{{courseId}}]\n}" }
+          }
+        },
+        {
+          "name": "Danh sach lo trinh -> 200",
+          "event": [{ "listen": "test", "script": { "exec": [
+            "pm.test('200 OK', () => pm.response.to.have.status(200));"
+          ] } }],
+          "request": {
+            "method": "GET",
+            "header": [{ "key": "Authorization", "value": "Bearer {{orgToken}}" }],
+            "url": "{{baseUrl}}/org/organizations/{{orgId}}/paths"
+          }
+        },
+        {
+          "name": "Cap khoa cho nguoi ngoai to chuc -> 400",
+          "event": [{ "listen": "test", "script": { "exec": [
+            "pm.test('400 Bad Request', () => pm.response.to.have.status(400));"
+          ] } }],
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Content-Type", "value": "application/json" },
+              { "key": "Authorization", "value": "Bearer {{orgToken}}" }
+            ],
+            "url": "{{baseUrl}}/org/organizations/{{orgId}}/assign",
+            "body": { "mode": "raw", "raw": "{\n  \"userId\": 999999,\n  \"courseId\": {{courseId}}\n}" }
+          }
+        },
+        {
+          "name": "Cap khoa hoc cho nhan su (can learning-service) -> 200",
+          "event": [{ "listen": "test", "script": { "exec": [
+            "pm.test('200 OK', () => pm.response.to.have.status(200));"
+          ] } }],
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Content-Type", "value": "application/json" },
+              { "key": "Authorization", "value": "Bearer {{orgToken}}" }
+            ],
+            "url": "{{baseUrl}}/org/organizations/{{orgId}}/assign",
+            "body": { "mode": "raw", "raw": "{\n  \"userId\": {{newUserId}},\n  \"courseId\": {{courseId}}\n}" }
+          }
+        },
+        {
+          "name": "Bao cao to chuc -> 200",
+          "event": [{ "listen": "test", "script": { "exec": [
+            "pm.test('200 OK', () => pm.response.to.have.status(200));",
+            "const d = pm.response.json().data;",
+            "pm.test('2 thanh vien, 1 lo trinh', () => { pm.expect(d.members).to.eql(2); pm.expect(d.paths).to.eql(1); });",
+            "pm.test('Goi BUSINESS', () => pm.expect(d.plan).to.eql('BUSINESS'));"
+          ] } }],
+          "request": {
+            "method": "GET",
+            "header": [{ "key": "Authorization", "value": "Bearer {{orgToken}}" }],
+            "url": "{{baseUrl}}/org/organizations/{{orgId}}/report"
+          }
+        },
+        {
+          "name": "Admin he thong xem to chuc nguoi khac -> 200",
+          "event": [{ "listen": "test", "script": { "exec": [
+            "pm.test('200 OK', () => pm.response.to.have.status(200));"
+          ] } }],
+          "request": {
+            "method": "GET",
+            "header": [{ "key": "Authorization", "value": "Bearer {{adminToken}}" }],
+            "url": "{{baseUrl}}/org/organizations/{{orgId}}/report"
+          }
+        },
+        {
+          "name": "To chuc khong ton tai -> 404",
+          "event": [{ "listen": "test", "script": { "exec": [
+            "pm.test('404 Not Found', () => pm.response.to.have.status(404));"
+          ] } }],
+          "request": {
+            "method": "GET",
+            "header": [{ "key": "Authorization", "value": "Bearer {{orgToken}}" }],
+            "url": "{{baseUrl}}/org/organizations/999999/report"
+          }
+        }
+      ]
+    }
+  ]
+}

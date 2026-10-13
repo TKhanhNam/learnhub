@@ -11,34 +11,56 @@ import org.springframework.transaction.annotation.Transactional;
 import vn.edu.learnhub.identity.dto.UserDtos;
 import vn.edu.learnhub.identity.entity.AppUser;
 import vn.edu.learnhub.identity.entity.EmailOutbox;
+import vn.edu.learnhub.identity.entity.PayoutKyc;
 import vn.edu.learnhub.identity.repository.AppUserRepository;
+import vn.edu.learnhub.identity.repository.PayoutKycRepository;
 import vn.edu.learnhub.identity.repository.EmailOutboxRepository;
+import vn.edu.learnhub.identity.repository.EmailVerificationRepository;
+import vn.edu.learnhub.identity.repository.PasswordResetRepository;
+import vn.edu.learnhub.identity.repository.RefreshTokenRepository;
 import vn.edu.learnhub.platform.error.BusinessException;
 import vn.edu.learnhub.platform.security.CurrentUser;
 
 import java.io.ByteArrayOutputStream;
 import java.time.Instant;
+import java.util.LinkedHashMap;
 import java.util.List;
+import java.util.Map;
 
 @Service
 public class UserService {
 
     private final AppUserRepository userRepository;
     private final EmailOutboxRepository emailOutboxRepository;
+    private final RefreshTokenRepository refreshTokenRepository;
+    private final EmailVerificationRepository emailVerificationRepository;
+    private final PasswordResetRepository passwordResetRepository;
     private final PasswordEncoder passwordEncoder;
     private final AuthService authService;
     private final AccountMailService accountMailService;
+    private final EmailVerificationService emailVerificationService;
+    private final PayoutKycRepository payoutKycRepository;
 
     public UserService(AppUserRepository userRepository,
                        EmailOutboxRepository emailOutboxRepository,
+                       RefreshTokenRepository refreshTokenRepository,
+                       EmailVerificationRepository emailVerificationRepository,
+                       PasswordResetRepository passwordResetRepository,
                        PasswordEncoder passwordEncoder,
                        AuthService authService,
-                       AccountMailService accountMailService) {
+                       AccountMailService accountMailService,
+                       EmailVerificationService emailVerificationService,
+                       PayoutKycRepository payoutKycRepository) {
         this.userRepository = userRepository;
         this.emailOutboxRepository = emailOutboxRepository;
+        this.refreshTokenRepository = refreshTokenRepository;
+        this.emailVerificationRepository = emailVerificationRepository;
+        this.passwordResetRepository = passwordResetRepository;
         this.passwordEncoder = passwordEncoder;
         this.authService = authService;
         this.accountMailService = accountMailService;
+        this.emailVerificationService = emailVerificationService;
+        this.payoutKycRepository = payoutKycRepository;
     }
 
     public UserDtos.UserDTO getById(Long id) {
@@ -66,6 +88,24 @@ public class UserService {
                 .map(user -> new UserDtos.PublicUserDTO(user.getId(), user.getFullName(),
                         user.getHeadline(), user.getAvatarUrl(), user.getRole()))
                 .toList();
+    }
+
+    public List<UserDtos.PublicUserDTO> searchInstructors(String keyword) {
+        String q = fold(keyword);
+        return userRepository.findByRole(Roles.INSTRUCTOR).stream()
+                .filter(user -> q.isBlank()
+                        || fold(user.getFullName()).contains(q)
+                        || fold(user.getUsername()).contains(q)
+                        || fold(user.getHeadline()).contains(q))
+                .limit(40)
+                .map(user -> new UserDtos.PublicUserDTO(user.getId(), user.getFullName(),
+                        user.getHeadline(), user.getAvatarUrl(), user.getRole()))
+                .toList();
+    }
+
+    private static String fold(String value) {
+        String normalized = java.text.Normalizer.normalize(value == null ? "" : value, java.text.Normalizer.Form.NFD);
+        return normalized.replaceAll("\\p{M}", "").toLowerCase(java.util.Locale.ROOT);
     }
 
     public Page<UserDtos.UserDTO> search(String keyword, Pageable pageable) {
@@ -131,7 +171,44 @@ public class UserService {
         if (request.language() != null && !request.language().isBlank()) {
             user.setLanguage(request.language());
         }
+        if (request.phone() != null) {
+            String phone = request.phone().trim();
+            if (phone.isEmpty()) {
+                user.setPhone(null);
+            } else if (!phone.matches("^[0-9+\\s.-]{8,20}$")) {
+                throw BusinessException.badRequest("So dien thoai khong hop le");
+            } else {
+                user.setPhone(phone);
+            }
+        }
         return toDto(userRepository.save(user));
+    }
+
+    @Transactional
+    public Map<String, Object> changeEmail(Long userId, UserDtos.ChangeEmailRequest request) {
+        AppUser user = findUser(userId);
+        if (!passwordEncoder.matches(request.currentPassword(), user.getPasswordHash())) {
+            throw BusinessException.badRequest("Mat khau hien tai khong dung");
+        }
+        String next = request.email().trim();
+        if (next.equalsIgnoreCase(user.getEmail())) {
+            Map<String, Object> same = new LinkedHashMap<>();
+            same.put("user", toDto(user));
+            return same;
+        }
+        if (userRepository.existsByEmailIgnoreCase(next)) {
+            throw BusinessException.conflict("Email da duoc su dung");
+        }
+        user.setEmail(next);
+        user.setEmailVerifiedAt(null);
+        userRepository.save(user);
+        String devUrl = emailVerificationService.issue(user);
+        Map<String, Object> data = new LinkedHashMap<>();
+        data.put("user", toDto(user));
+        if (devUrl != null) {
+            data.put("devVerifyUrl", devUrl);
+        }
+        return data;
     }
 
     @Transactional
@@ -147,15 +224,7 @@ public class UserService {
 
     @Transactional
     public UserDtos.UserDTO updateRole(Long userId, String role) {
-        String normalized = role.trim().toUpperCase();
-        if (!Roles.ALL.contains(normalized)) {
-            throw BusinessException.badRequest("Vai tro khong hop le");
-        }
-        AppUser user = findUser(userId);
-        user.setRole(normalized);
-        userRepository.save(user);
-        authService.revokeAllTokens(userId);
-        return toDto(user);
+        throw BusinessException.forbidden("Khong duoc doi vai tro tai khoan. Vai tro duoc gan luc dang ky.");
     }
 
     @Transactional
@@ -183,13 +252,91 @@ public class UserService {
             user.setLocked(false);
             user.setUnlockedAt(Instant.now());
             userRepository.save(user);
-            accountMailService.sendUnlockNotice(user);
+            String adminName = userRepository.findById(adminId).map(AppUser::getFullName).orElse("Quan tri vien");
+            String unlockReason = (reason == null || reason.isBlank()) ? "Quan tri vien da mo khoa tai khoan." : reason.trim();
+            accountMailService.sendUnlockNotice(user, unlockReason, adminName);
         }
         return toDto(user);
     }
 
+    @Transactional
+    public void deleteUser(Long userId, String reason) {
+        Long adminId = CurrentUser.requireId();
+        if (adminId.equals(userId)) {
+            throw BusinessException.badRequest("Ban khong the xoa tai khoan cua chinh minh");
+        }
+        String trimmed = reason == null ? "" : reason.trim();
+        if (trimmed.length() < 10) {
+            throw BusinessException.badRequest("Phai nhap ly do xoa tai khoan (toi thieu 10 ky tu) de gui email");
+        }
+        AppUser user = findUser(userId);
+        String adminName = userRepository.findById(adminId).map(AppUser::getFullName).orElse("Quan tri vien");
+        accountMailService.sendDeleteNotice(user, trimmed, adminName);
+        authService.revokeAllTokens(userId);
+        refreshTokenRepository.deleteByUserId(userId);
+        emailVerificationRepository.deleteByUserId(userId);
+        passwordResetRepository.deleteByUserId(userId);
+        userRepository.delete(user);
+    }
+
     public boolean isEmailVerified(Long id) {
         return findUser(id).getEmailVerifiedAt() != null;
+    }
+
+    public UserDtos.KycDTO myKyc(Long userId) {
+        AppUser user = findUser(userId);
+        return payoutKycRepository.findById(userId)
+                .map(row -> toKyc(row, user.getUsername()))
+                .orElseGet(() -> emptyKyc(user));
+    }
+
+    @Transactional
+    public UserDtos.KycDTO submitKyc(Long userId, UserDtos.KycSubmitRequest request) {
+        AppUser user = findUser(userId);
+        PayoutKyc row = payoutKycRepository.findById(userId).orElseGet(PayoutKyc::new);
+        if ("verified".equals(row.getStatus())) {
+            throw BusinessException.badRequest("Ho so da duoc duyet, khong gui lai");
+        }
+        row.setUserId(userId);
+        row.setLegalName(request.fullName().trim());
+        row.setIdNumber(request.idNumber().trim());
+        row.setBank(request.bank().trim());
+        row.setAccountNumber(request.accountNumber().trim());
+        row.setAccountName(request.accountName().trim());
+        row.setStatus("pending");
+        row.setSubmittedAt(Instant.now());
+        row.setReviewedAt(null);
+        return toKyc(payoutKycRepository.save(row), user.getUsername());
+    }
+
+    public List<UserDtos.KycDTO> pendingKyc() {
+        return payoutKycRepository.findByStatusOrderBySubmittedAtDesc("pending").stream()
+                .map(row -> {
+                    String username = userRepository.findById(row.getUserId())
+                            .map(AppUser::getUsername).orElse("");
+                    return toKyc(row, username);
+                })
+                .toList();
+    }
+
+    @Transactional
+    public UserDtos.KycDTO approveKyc(Long userId) {
+        PayoutKyc row = payoutKycRepository.findById(userId)
+                .orElseThrow(() -> BusinessException.notFound("Khong tim thay ho so nhan tien"));
+        row.setStatus("verified");
+        row.setReviewedAt(Instant.now());
+        String username = userRepository.findById(userId).map(AppUser::getUsername).orElse("");
+        return toKyc(payoutKycRepository.save(row), username);
+    }
+
+    private static UserDtos.KycDTO emptyKyc(AppUser user) {
+        return new UserDtos.KycDTO(user.getId(), user.getUsername(), "", "", "", "", "", "none", null);
+    }
+
+    private static UserDtos.KycDTO toKyc(PayoutKyc row, String username) {
+        return new UserDtos.KycDTO(row.getUserId(), username, row.getLegalName(), row.getIdNumber(),
+                row.getBank(), row.getAccountNumber(), row.getAccountName(), row.getStatus(),
+                row.getSubmittedAt());
     }
 
     private AppUser findUser(Long id) {
@@ -198,7 +345,7 @@ public class UserService {
     }
 
     private UserDtos.UserDTO toDto(AppUser user) {
-        return new UserDtos.UserDTO(user.getId(), user.getUsername(), user.getEmail(),
+        return new UserDtos.UserDTO(user.getId(), user.getUsername(), user.getEmail(), user.getPhone(),
                 user.getFullName(), user.getRole(), user.isLocked(), user.getLockReason(),
                 user.getLockedAt(), user.getLockedBy(), user.getHeadline(),
                 user.getBio(), user.getAvatarUrl(), user.getLanguage(), user.getCreatedAt(),

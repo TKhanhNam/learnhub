@@ -4,9 +4,12 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Propagation;
 import org.springframework.transaction.annotation.Transactional;
 import vn.edu.learnhub.identity.entity.AppUser;
+import vn.edu.learnhub.identity.entity.BlockedIp;
 import vn.edu.learnhub.identity.entity.SecurityAlert;
 import vn.edu.learnhub.identity.repository.AppUserRepository;
+import vn.edu.learnhub.identity.repository.BlockedIpRepository;
 import vn.edu.learnhub.identity.repository.SecurityAlertRepository;
+import vn.edu.learnhub.platform.error.BusinessException;
 
 import java.time.Instant;
 import java.time.temporal.ChronoUnit;
@@ -23,12 +26,15 @@ public class SecurityGuard {
     private final SecurityAlertRepository alerts;
     private final AppUserRepository users;
     private final AccountMailService mail;
+    private final BlockedIpRepository blockedIps;
     private final Map<String, Window> windows = new ConcurrentHashMap<>();
 
-    public SecurityGuard(SecurityAlertRepository alerts, AppUserRepository users, AccountMailService mail) {
+    public SecurityGuard(SecurityAlertRepository alerts, AppUserRepository users, AccountMailService mail,
+                         BlockedIpRepository blockedIps) {
         this.alerts = alerts;
         this.users = users;
         this.mail = mail;
+        this.blockedIps = blockedIps;
     }
 
     @Transactional(propagation = Propagation.REQUIRES_NEW)
@@ -44,11 +50,56 @@ public class SecurityGuard {
     public void loginFailed(String username, String ip) {
         boolean userFlood = !blank(username) && hit(key("user", username), 6, 10);
         boolean ipFlood = hit(key("ip", ip), 10, 10);
+        if (hit(key("lock", ip), 5, 10)) {
+            lockIp(ip);
+        }
         if (userFlood || ipFlood) {
             open(LOGIN_FLOOD, ip, username,
                     "Qua nhieu lan dang nhap sai tu may " + ip
                             + (blank(username) ? "." : " vao tai khoan " + username + "."));
         }
+    }
+
+    public void assertLoginAllowed(String ip) {
+        if (!isLocked(ip)) {
+            return;
+        }
+        BlockedIp row = blockedIps.findById(ip.trim()).orElse(null);
+        if (row != null && row.getExpiresAt() == null) {
+            throw BusinessException.forbidden("May nay da bi chan");
+        }
+        throw BusinessException.forbidden("IP bi khoa 15 phut vi nhap sai mat khau 5 lan trong 10 phut");
+    }
+
+    public boolean isLocked(String ip) {
+        if (blank(ip)) {
+            return false;
+        }
+        BlockedIp row = blockedIps.findById(ip.trim()).orElse(null);
+        if (row == null) {
+            return false;
+        }
+        if (row.getExpiresAt() != null && !row.getExpiresAt().isAfter(Instant.now())) {
+            blockedIps.delete(row);
+            return false;
+        }
+        return true;
+    }
+
+    private void lockIp(String ip) {
+        if (blank(ip)) {
+            return;
+        }
+        BlockedIp row = blockedIps.findById(ip.trim()).orElseGet(BlockedIp::new);
+        if (row.getIp() != null && row.getExpiresAt() == null
+                && row.getReason() != null && row.getReason().startsWith("Chan tu")) {
+            return;
+        }
+        row.setIp(ip.trim());
+        row.setReason("Sai mat khau 5 lan trong 10 phut");
+        row.setCreatedAt(Instant.now());
+        row.setExpiresAt(Instant.now().plus(15, ChronoUnit.MINUTES));
+        blockedIps.save(row);
     }
 
     @Transactional(propagation = Propagation.REQUIRES_NEW)

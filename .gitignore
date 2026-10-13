@@ -8,6 +8,8 @@ dist/
 .env
 .env.local
 payment-service/src/main/resources/payment-secrets.properties
+identity-service/src/main/resources/identity-secrets.properties
+assist-service/src/main/resources/assist-secrets.properties
 *.tsbuildinfo
 .DS_Store
 mail-outbox/

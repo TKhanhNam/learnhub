@@ -2,7 +2,7 @@ import { useEffect, useState } from 'react'
 import axiosClient from '../api/axiosClient'
 import { useI18n } from '../context/I18nContext'
 
-interface Demo { id: number; company: string; contactEmail: string; message: string; status: string }
+interface Demo { id: number; company: string; contactEmail: string; message: string; status: string; createdAt?: string }
 
 export default function AdminBusinessPage() {
   const { locale } = useI18n()
@@ -22,6 +22,7 @@ export default function AdminBusinessPage() {
             <strong>{d.company}</strong>
             <p>{d.contactEmail} · {d.status}</p>
             <p className="muted">{d.message}</p>
+            {d.createdAt && <p className="muted">{new Date(d.createdAt).toLocaleString('vi-VN')}</p>}
           </div>
         </article>
       ))}

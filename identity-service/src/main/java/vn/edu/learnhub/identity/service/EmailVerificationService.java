@@ -4,6 +4,7 @@ import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import vn.edu.learnhub.identity.entity.AppUser;
+import vn.edu.learnhub.identity.entity.EmailOutbox;
 import vn.edu.learnhub.identity.entity.EmailVerification;
 import vn.edu.learnhub.identity.repository.AppUserRepository;
 import vn.edu.learnhub.identity.repository.EmailVerificationRepository;
@@ -49,21 +50,22 @@ public class EmailVerificationService {
         row.setExpiresAt(Instant.now().plus(24, ChronoUnit.HOURS));
         verificationRepository.save(row);
         String url = webBase + "/verify-email?token=" + token;
-        mailService.sendVerification(user, url);
-        return mailService.smtpConfigured() ? null : url;
+        var sent = mailService.sendVerification(user, url);
+        return EmailOutbox.SENT.equals(sent.getStatus()) ? null : url;
     }
 
     @Transactional
-    public void confirm(String token) {
+    public AppUser confirm(String token) {
         if (token == null || token.isBlank()) {
             throw BusinessException.badRequest("Thieu ma xac thuc email");
         }
-        EmailVerification row = verificationRepository.findByTokenHash(sha256(token.trim()))
+        String raw = token.trim().replaceAll("\\s+", "");
+        EmailVerification row = verificationRepository.findByTokenHash(sha256(raw))
                 .orElseThrow(() -> BusinessException.badRequest("Lien ket xac thuc khong hop le"));
         AppUser user = userRepository.findById(row.getUserId())
                 .orElseThrow(() -> BusinessException.notFound("Khong tim thay tai khoan"));
         if (user.getEmailVerifiedAt() != null) {
-            return;
+            return user;
         }
         if (row.getUsedAt() != null || row.getExpiresAt().isBefore(Instant.now())) {
             throw BusinessException.badRequest("Lien ket xac thuc da het han");
@@ -71,7 +73,7 @@ public class EmailVerificationService {
         row.setUsedAt(Instant.now());
         user.setEmailVerifiedAt(Instant.now());
         verificationRepository.save(row);
-        userRepository.save(user);
+        return userRepository.save(user);
     }
 
     @Transactional

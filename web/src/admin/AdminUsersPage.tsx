@@ -1,5 +1,6 @@
 import { FormEvent, useEffect, useState } from 'react'
 import axiosClient from '../api/axiosClient'
+import { useAuth } from '../context/AuthContext'
 import { useI18n } from '../context/I18nContext'
 
 interface User {
@@ -23,13 +24,22 @@ interface MailLog {
   createdAt: string
 }
 
+function roleLabel(role: string, vi: boolean) {
+  if (role === 'ADMIN') return vi ? 'Quản trị' : 'Admin'
+  if (role === 'INSTRUCTOR') return vi ? 'Giảng viên' : 'Instructor'
+  if (role === 'ORG_ADMIN') return vi ? 'Doanh nghiệp' : 'Business'
+  return vi ? 'Học viên' : 'Student'
+}
+
 export default function AdminUsersPage() {
+  const { user } = useAuth()
   const { locale } = useI18n()
   const vi = locale === 'vi'
   const [users, setUsers] = useState<User[]>([])
   const [mails, setMails] = useState<MailLog[]>([])
   const [keyword, setKeyword] = useState('')
   const [lockUser, setLockUser] = useState<User | null>(null)
+  const [deleteUser, setDeleteUser] = useState<User | null>(null)
   const [reason, setReason] = useState('')
   const [msg, setMsg] = useState<string | null>(null)
 
@@ -58,10 +68,24 @@ export default function AdminUsersPage() {
     load()
   }
 
+  const remove = async () => {
+    if (!deleteUser) return
+    if (reason.trim().length < 10) {
+      setMsg(vi ? 'Lý do xóa phải từ 10 ký tự để gửi email.' : 'Delete reason must be at least 10 characters.')
+      return
+    }
+    await axiosClient.delete(`/api/users/${deleteUser.id}`, { data: { reason: reason.trim() } })
+    setMsg(vi
+      ? `Đã xóa ${deleteUser.username}. Lý do đã gửi tới ${deleteUser.email}.`
+      : `Deleted ${deleteUser.username}. Reason emailed to ${deleteUser.email}.`)
+    setDeleteUser(null)
+    setReason('')
+    load()
+  }
+
   return (
     <div>
       <h2>{vi ? 'Quản lý tài khoản' : 'Account management'}</h2>
-      <p className="muted">{vi ? 'Khóa tài khoản bắt buộc nhập lý do. Hệ thống gửi email tới địa chỉ đăng ký.' : 'Locking an account requires a reason, emailed to the registered address.'}</p>
       <form className="row" onSubmit={search} style={{ marginBottom: 16 }}>
         <input value={keyword} onChange={(e) => setKeyword(e.target.value)} placeholder={vi ? 'Tìm tên hoặc username' : 'Search name or username'} style={{ maxWidth: 280 }} />
         <button type="submit">{vi ? 'Tìm' : 'Search'}</button>
@@ -83,14 +107,7 @@ export default function AdminUsersPage() {
               <td>{u.id}</td>
               <td><strong>{u.fullName}</strong><div className="muted">{u.username}</div></td>
               <td>{u.email}</td>
-              <td>
-                <select defaultValue={u.role} onChange={async (e) => {
-                  await axiosClient.patch(`/api/users/${u.id}/role`, { role: e.target.value })
-                  load()
-                }}>
-                  {['STUDENT', 'INSTRUCTOR', 'ORG_ADMIN', 'ADMIN'].map((r) => <option key={r} value={r}>{r}</option>)}
-                </select>
-              </td>
+              <td>{roleLabel(u.role, vi)}</td>
               <td>
                 {u.locked
                   ? <span className="tag tag-rejected">{vi ? 'Đã khóa' : 'Locked'}</span>
@@ -98,14 +115,22 @@ export default function AdminUsersPage() {
                 {u.locked && u.lockReason && <div className="muted">{u.lockReason}</div>}
               </td>
               <td>
-                {u.locked ? (
-                  <button className="ghost" onClick={async () => {
-                    await axiosClient.patch(`/api/users/${u.id}/lock`, { locked: false, reason: '' })
-                    setMsg(vi ? `Đã mở khóa ${u.username}` : `Unlocked ${u.username}`)
-                    load()
-                  }}>{vi ? 'Mở khóa' : 'Unlock'}</button>
+                {u.id === user?.id ? (
+                  <span className="muted">{vi ? 'Tài khoản của bạn' : 'Your account'}</span>
+                ) : u.locked ? (
+                  <span className="row">
+                    <button className="ghost" onClick={async () => {
+                      await axiosClient.patch(`/api/users/${u.id}/lock`, { locked: false, reason: '' })
+                      setMsg(vi ? `Đã mở khóa ${u.username}` : `Unlocked ${u.username}`)
+                      load()
+                    }}>{vi ? 'Mở khóa' : 'Unlock'}</button>
+                    <button className="ghost" onClick={() => { setDeleteUser(u); setLockUser(null); setReason(''); setMsg(null) }}>{vi ? 'Xóa' : 'Delete'}</button>
+                  </span>
                 ) : (
-                  <button onClick={() => { setLockUser(u); setReason(''); setMsg(null) }}>{vi ? 'Khóa' : 'Lock'}</button>
+                  <span className="row">
+                    <button onClick={() => { setLockUser(u); setDeleteUser(null); setReason(''); setMsg(null) }}>{vi ? 'Khóa' : 'Lock'}</button>
+                    <button className="ghost" onClick={() => { setDeleteUser(u); setLockUser(null); setReason(''); setMsg(null) }}>{vi ? 'Xóa' : 'Delete'}</button>
+                  </span>
                 )}
               </td>
             </tr>
@@ -131,6 +156,24 @@ export default function AdminUsersPage() {
         </div>
       )}
 
+      {deleteUser && (
+        <div className="admin-modal">
+          <div className="card">
+            <div className="body">
+              <h3>{vi ? `Xóa ${deleteUser.fullName}` : `Delete ${deleteUser.fullName}`}</h3>
+              <p className="muted">{vi ? `Email nhận lý do: ${deleteUser.email}` : `Reason will be emailed to ${deleteUser.email}`}</p>
+              <label>{vi ? 'Lý do xóa (bắt buộc, gửi email)' : 'Delete reason (required, emailed)'}</label>
+              <textarea value={reason} onChange={(e) => setReason(e.target.value)} rows={4} placeholder={vi ? 'Ví dụ: Tài khoản giả mạo, vi phạm điều khoản...' : 'Example: Fake account, terms violation...'} />
+              {msg && <p className="err">{msg}</p>}
+              <div className="row" style={{ marginTop: 12 }}>
+                <button onClick={remove}>{vi ? 'Xóa và gửi email' : 'Delete and email'}</button>
+                <button className="ghost" onClick={() => setDeleteUser(null)}>{vi ? 'Hủy' : 'Cancel'}</button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
       <h3 style={{ marginTop: 28 }}>{vi ? 'Email đã gửi' : 'Sent email log'}</h3>
       {mails.length === 0 && <p className="muted">{vi ? 'Chưa có email khóa tài khoản.' : 'No lock emails yet.'}</p>}
       {mails.map((m) => (
@@ -142,7 +185,7 @@ export default function AdminUsersPage() {
           </div>
         </div>
       ))}
-      {msg && !lockUser && <p>{msg}</p>}
+      {msg && !lockUser && !deleteUser && <p>{msg}</p>}
     </div>
   )
 }

@@ -1,4 +1,5 @@
 import { FormEvent, useEffect, useState } from 'react'
+import { Link } from 'react-router-dom'
 import axiosClient from '../api/axiosClient'
 import QaPanel from '../components/QaPanel'
 
@@ -90,6 +91,7 @@ export default function StudioPage() {
   return (
     <div className="page">
       <h1>Studio giảng viên</h1>
+      <p><Link to="/sell">Kênh bán trên chợ: xác minh, gói quảng cáo, voucher shop, thu chi</Link></p>
       <p className="muted">{payout || 'Chưa có doanh thu — sàn giữ 30%, giảng viên nhận 70%.'}</p>
       <div className="tabs">
         {tabs.map((t) => (

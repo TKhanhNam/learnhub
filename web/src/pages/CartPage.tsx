@@ -47,6 +47,7 @@ export default function CartPage() {
   const [msg, setMsg] = useState<string | null>(null)
   const [busy, setBusy] = useState(false)
   const [paid, setPaid] = useState<PaidOrder | null>(null)
+  const [method, setMethod] = useState<'cod' | 'momo'>('cod')
 
   const load = () => {
     axiosClient.get('/api/commerce/cart').then((res) => {
@@ -191,8 +192,14 @@ export default function CartPage() {
         couponCode: code && couponState.status === 'valid' ? code : null,
         gift,
         recipientEmail: gift ? email : null,
+        paymentMethod: method,
       })
-      const order = res.data.data
+      const data = res.data.data
+      if (data?.payUrl) {
+        window.location.href = data.payUrl
+        return
+      }
+      const order = data?.order || data
       setPaid({
         id: Number(order?.id ?? 0),
         items: (order?.items || []).map((item: { title: string; price: number }) => ({
@@ -295,11 +302,27 @@ export default function CartPage() {
                 {coupon.trim() && (
                   <p className={couponState.status === 'valid' ? 'ok' : couponState.status === 'invalid' ? 'err' : 'muted'}>
                     {couponState.status === 'checking' && (vi ? 'Đang kiểm tra mã…' : 'Checking code…')}
-                    {couponState.status === 'valid' && (vi ? `Giảm ${couponState.percent}% — tiết kiệm ${vnd(discount)}` : `${couponState.percent}% off — you save ${vnd(discount)}`)}
+                    {couponState.status === 'valid' && (vi ? `Voucher sàn giảm ${couponState.percent}% — tiết kiệm ${vnd(discount)}` : `Platform voucher ${couponState.percent}% off — you save ${vnd(discount)}`)}
                     {couponState.status === 'invalid' && couponState.message}
                     {couponState.status === 'idle' && (vi ? 'Thêm khóa học để áp mã.' : 'Add a course to apply the code.')}
                   </p>
                 )}
+                <p className="muted">
+                  {vi
+                    ? 'Thanh toán thường ghi đơn và mở khóa học ngay. MoMo mở form thẻ quốc tế: số 4111 1111 1111 1111, hạn 05/26, CVC 111, tên NGUYEN VAN A.'
+                    : 'Standard checkout opens the course now. MoMo sends you to the test gateway.'}
+                </p>
+                <fieldset className="pay-choice">
+                  <legend>{vi ? 'Cách thanh toán' : 'Payment'}</legend>
+                  <label>
+                    <input type="radio" name="pay" checked={method === 'cod'} onChange={() => setMethod('cod')} />
+                    <span>{vi ? 'Thanh toán thường' : 'Standard checkout'}</span>
+                  </label>
+                  <label>
+                    <input type="radio" name="pay" checked={method === 'momo'} onChange={() => setMethod('momo')} />
+                    <span>MoMo</span>
+                  </label>
+                </fieldset>
 
                 <label className="cart-check">
                   <input type="checkbox" checked={gift} onChange={(e) => setGift(e.target.checked)} />
@@ -324,7 +347,11 @@ export default function CartPage() {
                 </dl>
 
                 <button className="cart-pay" onClick={checkout} disabled={items.length === 0 || busy}>
-                  {busy ? (vi ? 'Đang xử lý…' : 'Processing…') : `${t('checkout')} · ${vnd(total)}`}
+                  {busy
+                    ? (vi ? 'Đang xử lý…' : 'Processing…')
+                    : method === 'momo'
+                      ? (vi ? `Thanh toán MoMo · ${vnd(total)}` : `Pay with MoMo · ${vnd(total)}`)
+                      : (vi ? `Thanh toán thường · ${vnd(total)}` : `Checkout · ${vnd(total)}`)}
                 </button>
                 {msg && <p className="err">{msg}</p>}
               </>

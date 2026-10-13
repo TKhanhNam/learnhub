@@ -1,6 +1,5 @@
 import { Link } from 'react-router-dom'
 import { useI18n } from '../context/I18nContext'
-import LanguageSwitch from './LanguageSwitch'
 
 export default function Footer() {
   const { t, locale } = useI18n()
@@ -13,11 +12,8 @@ export default function Footer() {
           <Link to="/courses">{t('courses')}</Link>
           <Link to="/business">{t('business')}</Link>
           <Link to="/help">{t('help')}</Link>
+          <Link to="/terms">{vi ? 'Điều khoản' : 'Terms'}</Link>
         </nav>
-        <div className="site-footer-lang">
-          <span>{vi ? 'Ngôn ngữ' : 'Language'}</span>
-          <LanguageSwitch />
-        </div>
       </div>
     </footer>
   )

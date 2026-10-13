@@ -1,6 +1,20 @@
 import { useState } from 'react'
+import axiosClient from '../api/axiosClient'
 import { useI18n } from '../context/I18nContext'
-import { downloadExcel } from './adminUtils'
+import { downloadExcel, downloadRows } from './adminUtils'
+
+async function allPages(url: string) {
+  const rows: Record<string, unknown>[] = []
+  let page = 0
+  let totalPages = 1
+  while (page < totalPages) {
+    const res = await axiosClient.get(url, { params: { page, size: 100 } })
+    rows.push(...(res.data.data || []))
+    totalPages = Number(res.data.meta?.totalPages || 1)
+    page += 1
+  }
+  return rows
+}
 
 export default function AdminReportsPage() {
   const { locale } = useI18n()
@@ -12,8 +26,40 @@ export default function AdminReportsPage() {
     setBusy(key)
     setMsg(null)
     try {
-      await downloadExcel(url, filename)
-      setMsg(vi ? `Đã tải ${filename}` : `Downloaded ${filename}`)
+      try {
+        await downloadExcel(url, filename)
+      } catch {
+        if (key === 'users') {
+          const users = await allPages('/api/users')
+          downloadRows(filename.replace('.xlsx', '.xls'), 'Tai khoan',
+            ['ID', 'Ten dang nhap', 'Email', 'Ho ten', 'Vai tro', 'Khoa', 'Ngay tao'],
+            users.map((user) => [
+              Number(user.id || 0),
+              String(user.username || ''),
+              String(user.email || ''),
+              String(user.fullName || ''),
+              String(user.role || ''),
+              user.locked ? 'Khoa' : 'Hoat dong',
+              String(user.createdAt || ''),
+            ]))
+        } else if (key === 'courses') {
+          const courses = await allPages('/api/catalog/admin/courses?status=PUBLISHED')
+          downloadRows(filename.replace('.xlsx', '.xls'), 'Khoa hoc',
+            ['ID', 'Tieu de', 'Gia', 'Danh muc', 'Cap do', 'Hoc vien', 'Danh gia'],
+            courses.map((course) => [
+              Number(course.id || 0),
+              String(course.title || ''),
+              Number(course.price || 0),
+              String(course.categoryName || ''),
+              String(course.level || ''),
+              Number(course.enrollmentCount || 0),
+              Number(course.ratingAvg || 0),
+            ]))
+        } else {
+          throw new Error('export failed')
+        }
+      }
+      setMsg(vi ? `Đã tải ${filename.replace('.xlsx', '')}` : `Downloaded ${filename}`)
     } catch {
       setMsg(vi ? 'Không xuất được file. Hãy chạy lại backend rồi thử lại.' : 'Export failed. Restart the backend and retry.')
     } finally {

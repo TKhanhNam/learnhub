@@ -1,8 +1,11 @@
 import { useEffect, useMemo, useState } from 'react'
-import { Link, useSearchParams } from 'react-router-dom'
+import { Link, useNavigate, useSearchParams } from 'react-router-dom'
+import { useAuth } from '../context/AuthContext'
 import { useI18n } from '../context/I18nContext'
 import { SUBJECTS } from '../data/subjects'
 import { HOT_COURSE_LIMIT, localTopCourses, mergeHotList, recordCourseClick, recordSearchHits, fetchHotCourses } from '../lib/coursePopularity'
+import FavButton from '../components/FavButton'
+import { messageTeacher } from '../components/ChatDock'
 
 function mergeHotCourses(server: Course[], localPreferred: ReturnType<typeof localTopCourses>): Course[] {
   return mergeHotList(server, localPreferred, HOT_COURSE_LIMIT) as Course[]
@@ -19,6 +22,15 @@ interface Course {
   ratingAvg?: number
   ratingCount?: number
   enrollmentCount?: number
+  instructorId?: number
+  instructorName?: string
+}
+
+interface TeacherHome {
+  id: number
+  fullName: string
+  headline: string
+  courseCount: number
 }
 
 const COVERS = [
@@ -34,6 +46,10 @@ const COVERS = [
 
 function coverFor(id: number) {
   return COVERS[Math.abs(id) % COVERS.length]
+}
+
+function fold(value: string) {
+  return value.normalize('NFD').replace(/\p{M}/gu, '').toLowerCase()
 }
 
 function levelLabel(level: string, vi: boolean) {
@@ -55,6 +71,7 @@ function CourseCard({ course, featured, t, vi, onOpen }: {
   const track = () => onOpen?.(course)
   return (
     <article className={`dx-card${featured ? ' featured' : ''}`}>
+      <FavButton slug={course.slug} />
       <Link to={`/courses/${course.slug}`} className="dx-cover" style={{ background: coverFor(course.id) }} onClick={track}>
         {(featured || students > 50) && <span className="dx-badge">{t('bestSeller')}</span>}
         <span className="dx-cover-label">{course.categoryName}</span>
@@ -63,7 +80,7 @@ function CourseCard({ course, featured, t, vi, onOpen }: {
         <p className="dx-kicker">LearnHub · {levelLabel(course.level, vi)}</p>
         <Link to={`/courses/${course.slug}`} onClick={track}><h3>{course.title}</h3></Link>
         <p className="dx-sub">{course.subtitle}</p>
-        <p className="dx-by">{t('aCourseBy')}</p>
+        <p className="dx-by">{course.instructorName || t('aCourseBy')}</p>
         <div className="dx-stats">
           {students > 0
             ? <span>{students.toLocaleString(vi ? 'vi-VN' : 'en')}</span>
@@ -78,6 +95,8 @@ function CourseCard({ course, featured, t, vi, onOpen }: {
 
 export default function CoursesPage() {
   const { t, locale } = useI18n()
+  const { user } = useAuth()
+  const navigate = useNavigate()
   const vi = locale === 'vi'
   const [params] = useSearchParams()
   const [courses, setCourses] = useState<Course[]>([])
@@ -86,6 +105,7 @@ export default function CoursesPage() {
   const [hitTick, setHitTick] = useState(0)
   const [error, setError] = useState<string | null>(null)
   const [loading, setLoading] = useState(true)
+  const [teachers, setTeachers] = useState<TeacherHome[]>([])
   const category = params.get('category') || ''
   const keyword = params.get('q') || ''
   const view = params.get('view') || '' // new | popular | ''
@@ -117,7 +137,6 @@ export default function CoursesPage() {
         }
 
         const search = new URLSearchParams()
-        if (keyword) search.set('keyword', keyword)
         if (category) search.set('category', category)
         search.set('size', '100')
         if (view === 'new') search.set('sort', 'id,desc')
@@ -126,6 +145,73 @@ export default function CoursesPage() {
         let list: Course[] = Array.isArray(body?.data) ? body.data : []
         if (view === 'new') {
           list = [...list].sort((a, b) => Number(b.id) - Number(a.id))
+        }
+        const q = fold(keyword.trim())
+        if (q) {
+          const ids = [...new Set(list.map((item) => Number(item.instructorId || 0)).filter((id) => id > 0))]
+          const [listed, searched] = await Promise.all([
+            Promise.all(ids.map(async (id) => {
+              try {
+                const res = await fetch(`/api/users/${id}/public`)
+                const profile = await res.json()
+                const data = profile?.data
+                return {
+                  id,
+                  fullName: String(data?.fullName || ''),
+                  headline: String(data?.headline || ''),
+                }
+              } catch {
+                return { id, fullName: '', headline: '' }
+              }
+            })),
+            fetch(`/api/users/instructors?keyword=${encodeURIComponent(keyword.trim())}`)
+              .then((res) => res.json())
+              .then((body) => (Array.isArray(body?.data) ? body.data : []) as { id: number; fullName?: string; headline?: string }[])
+              .catch(() => [] as { id: number; fullName?: string; headline?: string }[]),
+          ])
+          if (cancelled) return
+          const profiles = [...listed]
+          for (const row of searched) {
+            if (!profiles.some((profile) => profile.id === row.id)) {
+              profiles.push({
+                id: row.id,
+                fullName: String(row.fullName || ''),
+                headline: String(row.headline || ''),
+              })
+            }
+          }
+          const byId = new Map(profiles.map((profile) => [profile.id, profile]))
+          list = list.map((item) => ({
+            ...item,
+            instructorName: byId.get(Number(item.instructorId || 0))?.fullName || item.instructorName,
+          }))
+          const matchedIds = new Set(
+            profiles
+              .filter((profile) => {
+                const hay = fold(`${profile.fullName} ${profile.headline}`)
+                return hay.includes(q) || q.split(/\s+/).filter((part) => part.length > 1).every((part) => hay.includes(part))
+              })
+              .map((profile) => profile.id),
+          )
+          const titled = list.filter((item) => fold(`${item.title} ${item.subtitle} ${item.categoryName}`).includes(q))
+          const byTeacher = list.filter((item) => matchedIds.has(Number(item.instructorId || 0)))
+          const seen = new Set<number>()
+          list = [...byTeacher, ...titled].filter((item) => {
+            if (seen.has(item.id)) return false
+            seen.add(item.id)
+            return true
+          })
+          const homes = profiles
+            .filter((profile) => matchedIds.has(profile.id))
+            .map((profile) => ({
+              id: profile.id,
+              fullName: profile.fullName,
+              headline: profile.headline || (vi ? 'Giảng viên LearnHub' : 'LearnHub instructor'),
+              courseCount: byTeacher.filter((item) => Number(item.instructorId) === profile.id).length,
+            }))
+          setTeachers(homes)
+        } else if (!cancelled) {
+          setTeachers([])
         }
         setCourses(list)
         if (keyword.trim() && list.length) {
@@ -186,7 +272,9 @@ export default function CoursesPage() {
     return [...map.entries()]
   }, [courses, vi, view])
 
-  const title = exploreNew
+  const title = teachers.length === 1
+    ? teachers[0].fullName
+    : exploreNew
     ? (vi ? 'Khóa học mới' : 'New courses')
     : explorePopular
       ? (vi ? 'Khóa phổ biến' : 'Popular courses')
@@ -256,10 +344,47 @@ export default function CoursesPage() {
           </aside>
           <main className="dx-main">
             <h1>{title}</h1>
+            {teachers.map((teacher) => (
+              <section key={teacher.id} className="teacher-home">
+                <div className="teacher-avatar" aria-hidden="true">{teacher.fullName.trim().charAt(0).toUpperCase() || 'G'}</div>
+                <div>
+                  <p>{vi ? 'Trang giảng viên' : 'Instructor home'}</p>
+                  <h2>{teacher.fullName}</h2>
+                  <p className="muted">{teacher.headline}</p>
+                  <p>{teacher.courseCount} {vi ? 'khóa học' : 'courses'}</p>
+                </div>
+                {user?.id !== teacher.id && (
+                  <button
+                    type="button"
+                    className="ghost"
+                    onClick={() => {
+                      if (!user) {
+                        navigate('/login')
+                        return
+                      }
+                      messageTeacher({
+                        instructorId: teacher.id,
+                        instructorName: teacher.fullName,
+                        learnerId: user.id,
+                        learnerName: user.fullName || user.username,
+                        courseTitle: teacher.fullName,
+                        courseSlug: 'home',
+                      })
+                    }}
+                  >
+                    {vi ? 'Nhắn giảng viên' : 'Message instructor'}
+                  </button>
+                )}
+              </section>
+            ))}
             {loading && <p className="muted">{vi ? 'Đang tải khóa học…' : 'Loading courses…'}</p>}
             {error && <p className="err">{error}</p>}
-            {!loading && !error && courses.length === 0 && (
-              <p className="muted">{vi ? 'Chưa có khóa học trong mục này.' : 'No courses in this category yet.'}</p>
+            {!loading && !error && courses.length === 0 && teachers.length === 0 && (
+              <p className="muted">
+                {keyword
+                  ? (vi ? 'Không có khóa học hoặc giảng viên khớp từ khóa này.' : 'No courses or instructors match that search.')
+                  : (vi ? 'Chưa có khóa học trong mục này.' : 'No courses in this category yet.')}
+              </p>
             )}
             {!category && !keyword && !view && featured.length > 0 && (
               <section>

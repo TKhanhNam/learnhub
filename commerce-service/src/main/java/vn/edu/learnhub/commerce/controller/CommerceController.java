@@ -48,11 +48,17 @@ public class CommerceController {
     @PostMapping("/checkout")
     public ApiResponse<CommerceDtos.CheckoutResult> checkout(@RequestBody(required = false) CommerceDtos.CheckoutRequest request) {
         CommerceDtos.CheckoutResult result = commerceService.checkout(CurrentUser.requireId(),
-                request == null ? new CommerceDtos.CheckoutRequest(null, false, null, null) : request);
+                request == null ? new CommerceDtos.CheckoutRequest(null, false, null, null, "cod") : request);
         String message = result.payUrl() == null
                 ? "Da cap quyen hoc"
                 : "Chuyen sang cong MoMo de thanh toan";
         return ApiResponse.created(result, message);
+    }
+
+    @PostMapping("/orders/{id}/pay-momo")
+    public ApiResponse<CommerceDtos.CheckoutResult> payMomoAgain(@PathVariable Long id) {
+        return ApiResponse.ok(commerceService.payMomoAgain(CurrentUser.requireId(), id),
+                "Chuyen sang cong MoMo de thanh toan lai");
     }
 
     @GetMapping("/orders")

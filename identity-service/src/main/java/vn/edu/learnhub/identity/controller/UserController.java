@@ -8,6 +8,7 @@ import org.springframework.http.HttpHeaders;
 import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.prepost.PreAuthorize;
+import org.springframework.web.bind.annotation.DeleteMapping;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PatchMapping;
 import org.springframework.web.bind.annotation.PathVariable;
@@ -23,6 +24,7 @@ import vn.edu.learnhub.platform.api.ApiResponse;
 import vn.edu.learnhub.platform.security.CurrentUser;
 
 import java.util.List;
+import java.util.Map;
 
 @RestController
 @RequestMapping("/users")
@@ -46,11 +48,24 @@ public class UserController {
                 "Cap nhat thong tin thanh cong");
     }
 
+    @PostMapping("/me/change-email")
+    public ApiResponse<Map<String, Object>> changeEmail(
+            @Valid @RequestBody UserDtos.ChangeEmailRequest request) {
+        return ApiResponse.ok(userService.changeEmail(CurrentUser.requireId(), request),
+                "Da doi email, hay xac thuc email moi");
+    }
+
     @PostMapping("/me/change-password")
     public ApiResponse<Void> changePassword(
             @Valid @RequestBody UserDtos.ChangePasswordRequest request) {
         userService.changePassword(CurrentUser.requireId(), request);
         return ApiResponse.ok(null, "Doi mat khau thanh cong, vui long dang nhap lai");
+    }
+
+    @GetMapping("/instructors")
+    public ApiResponse<List<UserDtos.PublicUserDTO>> instructors(
+            @RequestParam(required = false) String keyword) {
+        return ApiResponse.ok(userService.searchInstructors(keyword));
     }
 
     @GetMapping("/{id}/public")
@@ -65,6 +80,28 @@ public class UserController {
             @PageableDefault(size = 20) Pageable pageable) {
         Page<UserDtos.UserDTO> page = userService.search(keyword, pageable);
         return ApiResponse.page(page);
+    }
+
+    @GetMapping("/me/kyc")
+    public ApiResponse<UserDtos.KycDTO> myKyc() {
+        return ApiResponse.ok(userService.myKyc(CurrentUser.requireId()));
+    }
+
+    @PutMapping("/me/kyc")
+    public ApiResponse<UserDtos.KycDTO> submitKyc(@Valid @RequestBody UserDtos.KycSubmitRequest request) {
+        return ApiResponse.ok(userService.submitKyc(CurrentUser.requireId(), request), "Da gui ho so nhan tien");
+    }
+
+    @GetMapping("/admin/kyc")
+    @PreAuthorize("hasRole('ADMIN')")
+    public ApiResponse<List<UserDtos.KycDTO>> pendingKyc() {
+        return ApiResponse.ok(userService.pendingKyc());
+    }
+
+    @PatchMapping("/{id}/kyc")
+    @PreAuthorize("hasRole('ADMIN')")
+    public ApiResponse<UserDtos.KycDTO> approveKyc(@PathVariable Long id) {
+        return ApiResponse.ok(userService.approveKyc(id), "Da duyet ho so nhan tien");
     }
 
     @GetMapping("/admin/stats")
@@ -104,5 +141,13 @@ public class UserController {
         boolean locked = Boolean.TRUE.equals(request.locked());
         return ApiResponse.ok(userService.setLocked(id, locked, request.reason()),
                 locked ? "Da khoa tai khoan va gui email ly do" : "Da mo khoa tai khoan");
+    }
+
+    @DeleteMapping("/{id}")
+    @PreAuthorize("hasRole('ADMIN')")
+    public ApiResponse<Void> delete(@PathVariable Long id,
+                                    @Valid @RequestBody UserDtos.DeleteRequest request) {
+        userService.deleteUser(id, request.reason());
+        return ApiResponse.ok(null, "Da xoa tai khoan va gui email ly do");
     }
 }

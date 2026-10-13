@@ -11,6 +11,7 @@ import vn.edu.learnhub.identity.repository.SecurityAlertRepository;
 import vn.edu.learnhub.platform.error.BusinessException;
 
 import java.time.Instant;
+import java.util.ArrayList;
 import java.util.List;
 
 @Service
@@ -34,8 +35,18 @@ public class SecurityAdminService {
         return alerts.findTop50ByOrderByCreatedAtDesc().stream().map(this::toView).toList();
     }
 
+    @Transactional
     public List<String> blockedAddresses() {
-        return blockedIps.findAll().stream().map(BlockedIp::getIp).toList();
+        Instant now = Instant.now();
+        List<String> active = new ArrayList<>();
+        for (BlockedIp row : blockedIps.findAll()) {
+            if (row.getExpiresAt() != null && !row.getExpiresAt().isAfter(now)) {
+                blockedIps.delete(row);
+                continue;
+            }
+            active.add(row.getIp());
+        }
+        return active;
     }
 
     @Transactional
@@ -62,6 +73,7 @@ public class SecurityAdminService {
             row.setIp(alert.getSourceIp());
             row.setReason("Chan tu canh bao #" + alert.getId());
             row.setCreatedAt(Instant.now());
+            row.setExpiresAt(null);
             blockedIps.save(row);
             note.append("Da chan may ").append(alert.getSourceIp()).append(".");
         } else if (loopback(alert.getSourceIp())) {

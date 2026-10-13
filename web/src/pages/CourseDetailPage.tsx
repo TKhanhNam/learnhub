@@ -5,6 +5,8 @@ import axiosClient from '../api/axiosClient'
 import { useAuth } from '../context/AuthContext'
 import { useI18n } from '../context/I18nContext'
 import QaPanel from '../components/QaPanel'
+import FavButton from '../components/FavButton'
+import { messageTeacher } from '../components/ChatDock'
 import { recordCourseClick } from '../lib/coursePopularity'
 
 interface Course {
@@ -37,6 +39,33 @@ interface Lecture { id: number; title: string; type: string; durationSeconds: nu
 interface Quiz { id: number; title: string; kind: string }
 interface Assignment { id: number; title: string }
 
+const COVERS = [
+  'linear-gradient(145deg,#0f766e,#2dd4bf)',
+  'linear-gradient(145deg,#9f1239,#fb7185)',
+  'linear-gradient(145deg,#1d4ed8,#93c5fd)',
+  'linear-gradient(145deg,#7c2d12,#fb923c)',
+  'linear-gradient(145deg,#4c1d95,#c4b5fd)',
+  'linear-gradient(145deg,#14532d,#86efac)',
+  'linear-gradient(145deg,#831843,#f9a8d4)',
+  'linear-gradient(145deg,#1e3a8a,#38bdf8)',
+]
+
+function coverFor(id: number) {
+  return COVERS[Math.abs(id) % COVERS.length]
+}
+
+function levelLabel(level: string, vi: boolean) {
+  if (level === 'BEGINNER') return vi ? 'Cơ bản' : 'Beginner'
+  if (level === 'ADVANCED') return vi ? 'Nâng cao' : 'Advanced'
+  return vi ? 'Trung cấp' : 'Intermediate'
+}
+
+function clock(seconds: number) {
+  const total = Math.max(0, Number(seconds) || 0)
+  if (total < 60) return `${total}s`
+  return `${Math.round(total / 60)} phút`
+}
+
 export default function CourseDetailPage() {
   const { slug } = useParams()
   const { t, locale } = useI18n()
@@ -50,6 +79,7 @@ export default function CourseDetailPage() {
   const [rating, setRating] = useState(5)
   const [comment, setComment] = useState('')
   const [msg, setMsg] = useState<string | null>(null)
+  const [teacher, setTeacher] = useState('')
   const { isAuthenticated, user } = useAuth()
   const navigate = useNavigate()
 
@@ -66,6 +96,11 @@ export default function CourseDetailPage() {
       }).catch(() => {})
       if (isAuthenticated) {
         axiosClient.get(`/api/learning/access/${c.id}`).then((r) => setOwned(!!r.data.data?.hasAccess)).catch(() => {})
+      }
+      if (c.instructorId) {
+        fetch(`/api/users/${c.instructorId}/public`).then((r) => r.json()).then((body) => {
+          setTeacher(body?.data?.fullName || '')
+        }).catch(() => {})
       }
     }).catch((err) => setMsg(err.response?.data?.message || (vi ? 'Không tải được khóa học' : 'Could not load course')))
   }, [slug, locale, isAuthenticated])
@@ -99,70 +134,124 @@ export default function CourseDetailPage() {
   if (!course) return <div className="page">{msg || (vi ? 'Đang tải...' : 'Loading...')}</div>
 
   const canTeach = user?.role === 'ADMIN' || user?.role === 'INSTRUCTOR'
+  const quizCount = quizzes.filter((q) => q.kind !== 'PRACTICE').length
+  const practiceCount = quizzes.filter((q) => q.kind === 'PRACTICE').length
+  const price = `${Number(course.price).toLocaleString('vi-VN')} ₫`
 
   return (
     <div className="page course-detail">
-      <p className="muted">{course.categoryName} · {course.level}</p>
-      <h1>{course.title}</h1>
-      <p className="muted">{course.subtitle}</p>
-      <p>{course.description}</p>
-      <p>{course.enrollmentCount} {t('students')} · {Number(course.ratingAvg || 0).toFixed(1)}/5 ({course.ratingCount || 0})</p>
-      {course.skills?.length ? <p className="muted">{vi ? 'Kỹ năng:' : 'Skills:'} {course.skills.join(', ')}</p> : null}
-      {course.aiAssistEnabled && <p className="muted">{vi ? 'Khóa này bật trợ lý AI (sàn đớp thêm % trên phần giảng viên).' : 'AI assistant is on (platform takes an extra %).'}</p>}
-      <p className="price">{Number(course.price).toLocaleString('vi-VN')} ₫ · {t('lifetime')}</p>
-      <div className="row">
-        {owned ? (
-          <Link to={`/learn/${course.id}`}><button>{vi ? 'Vào học' : 'Start learning'}</button></Link>
-        ) : (
-          <>
-            <button onClick={() => addCart(false)}>{t('addToCart')}</button>
-            <button className="ghost" onClick={() => addCart(true)}>{t('gift')}</button>
-          </>
-        )}
+      <nav className="cd-crumb">
+        <Link to="/courses">{t('courses')}</Link>
+        <span>/</span>
+        <span>{course.categoryName}</span>
+      </nav>
+
+      <div className="cd-layout">
+        <div className="cd-main">
+          <header className="cd-hero" style={{ background: coverFor(course.id) }}>
+            <FavButton slug={course.slug} />
+            <p>{course.categoryName} · {levelLabel(course.level, vi)}</p>
+            <h1>{course.title}</h1>
+            <p>{course.subtitle}</p>
+          </header>
+
+          <section className="cd-panel">
+            <div className="cd-stats">
+              <div><strong>{course.enrollmentCount}</strong><span>{t('students')}</span></div>
+              <div><strong>{Number(course.ratingAvg || 0).toFixed(1)}</strong><span>/5 · {course.ratingCount || 0}</span></div>
+              <div><strong>{lectures.length}</strong><span>{vi ? 'bài giảng' : 'lectures'}</span></div>
+            </div>
+            <p className="cd-lead">{course.description}</p>
+            {course.skills?.length ? (
+              <div className="cd-skills">
+                {course.skills.map((skill) => <span key={skill}>{skill}</span>)}
+              </div>
+            ) : null}
+            {course.aiAssistEnabled && (
+              <p className="cd-note">{vi ? 'Khóa này có trợ lý AI khi đang học.' : 'This course includes the AI assistant while you learn.'}</p>
+            )}
+          </section>
+
+          {course.promoVideoUrl && (
+            <video className="player" src={course.promoVideoUrl} controls />
+          )}
+
+          <section className="cd-panel">
+            <h2>{vi ? 'Giáo trình' : 'Curriculum'}</h2>
+            <p className="muted">
+              {quizCount} quiz · {practiceCount} practice test · {assignments.length} {vi ? 'bài tập' : 'assignments'}
+            </p>
+            {lectures.length === 0 && <p className="muted">{vi ? 'Giảng viên chưa đăng bài giảng.' : 'No lectures yet.'}</p>}
+            <ol className="cd-lessons">
+              {lectures.map((lecture, index) => (
+                <li key={lecture.id}>
+                  <span>{String(index + 1).padStart(2, '0')}</span>
+                  <div>
+                    <strong>{lecture.title}</strong>
+                    <small>{lecture.type} · {clock(lecture.durationSeconds)}</small>
+                  </div>
+                  {owned && lecture.downloadUrl && (
+                    <a href={lecture.downloadUrl} target="_blank" rel="noreferrer">{vi ? 'Tải' : 'Download'}</a>
+                  )}
+                </li>
+              ))}
+            </ol>
+          </section>
+
+          <section className="cd-panel">
+            <h2>{t('reviews')}</h2>
+            {owned && (
+              <form onSubmit={sendReview} className="cd-review-form">
+                <label>{vi ? 'Đánh giá sau khi mua' : 'Review after purchase'}</label>
+                <select value={rating} onChange={(e) => setRating(Number(e.target.value))}>
+                  {[5, 4, 3, 2, 1].map((n) => <option key={n} value={n}>{n}/5</option>)}
+                </select>
+                <textarea value={comment} onChange={(e) => setComment(e.target.value)} rows={3} placeholder={vi ? 'Bạn học được gì từ khóa này?' : 'What did you learn?'} />
+                <button type="submit">{vi ? 'Gửi đánh giá' : 'Submit review'}</button>
+              </form>
+            )}
+            {reviews.map((review) => (
+              <article key={review.id} className="cd-review">
+                <header>
+                  <strong>{review.authorName}</strong>
+                  <span>{review.rating}/5</span>
+                </header>
+                <p>{review.comment}</p>
+                {review.instructorReply && <p className="muted">{vi ? 'Giảng viên:' : 'Instructor:'} {review.instructorReply}</p>}
+              </article>
+            ))}
+            {reviews.length === 0 && <p className="muted">{vi ? 'Chưa có đánh giá.' : 'No reviews yet.'}</p>}
+          </section>
+
+          <section className="cd-panel">
+            <QaPanel courseId={course.id} canPost={owned} canAnswer={owned || canTeach} vi={vi} />
+          </section>
+        </div>
+
+        <aside className="cd-buy">
+          <p className="cd-price">{price}</p>
+          <p className="muted">{t('lifetime')}</p>
+          {owned ? (
+            <Link to={`/learn/${course.id}`}><button type="button">{vi ? 'Vào học' : 'Start learning'}</button></Link>
+          ) : (
+            <>
+              <button type="button" onClick={() => addCart(false)}>{t('addToCart')}</button>
+              <button type="button" className="ghost" onClick={() => addCart(true)}>{t('gift')}</button>
+            </>
+          )}
+          {user && user.id !== course.instructorId && (
+            <button type="button" className="ghost" onClick={() => messageTeacher({
+              instructorId: course.instructorId,
+              instructorName: teacher || (vi ? 'Giảng viên' : 'Instructor'),
+              learnerId: user.id,
+              learnerName: user.fullName || user.username,
+              courseTitle: course.title,
+              courseSlug: course.slug,
+            })}>{vi ? 'Nhắn giảng viên' : 'Message instructor'}</button>
+          )}
+          {msg && <p className={msg.includes('Đã') || msg.includes('submitted') ? 'ok' : 'err'}>{msg}</p>}
+        </aside>
       </div>
-      {course.promoVideoUrl && (
-        <video className="player" src={course.promoVideoUrl} controls style={{ marginTop: 16, width: '100%', maxHeight: 360 }} />
-      )}
-      {msg && <p>{msg}</p>}
-
-      <h3>{vi ? 'Giáo trình' : 'Curriculum'}</h3>
-      {lectures.map((l) => (
-        <div key={l.id} className="card" style={{ marginBottom: 6 }}>
-          <div className="body row">
-            <span className="grow">{l.title}</span>
-            <span className="muted">{l.type} · {l.durationSeconds}s</span>
-            {owned && l.downloadUrl && <a href={l.downloadUrl} target="_blank" rel="noreferrer">{vi ? 'Tải tài liệu' : 'Download'}</a>}
-          </div>
-        </div>
-      ))}
-      {lectures.length === 0 && <p className="muted">{vi ? 'Giảng viên chưa đăng bài giảng.' : 'No lectures yet.'}</p>}
-      <p className="muted">
-        {quizzes.filter((q) => q.kind !== 'PRACTICE').length} quiz · {quizzes.filter((q) => q.kind === 'PRACTICE').length} practice test · {assignments.length} {vi ? 'bài tập' : 'assignments'}
-      </p>
-
-      <h3>{t('reviews')}</h3>
-      {owned && (
-        <form onSubmit={sendReview} className="stack" style={{ maxWidth: 520, marginBottom: 16 }}>
-          <label>{vi ? 'Đánh giá của bạn (sau khi mua)' : 'Your review (after purchase)'}</label>
-          <select value={rating} onChange={(e) => setRating(Number(e.target.value))}>
-            {[5, 4, 3, 2, 1].map((n) => <option key={n} value={n}>{n}/5</option>)}
-          </select>
-          <textarea value={comment} onChange={(e) => setComment(e.target.value)} rows={3} />
-          <button type="submit">{vi ? 'Gửi đánh giá' : 'Submit review'}</button>
-        </form>
-      )}
-      {reviews.map((r) => (
-        <div key={r.id} className="card" style={{ marginBottom: 8 }}>
-          <div className="body">
-            <strong>{r.authorName}</strong> · {r.rating}/5
-            <p>{r.comment}</p>
-            {r.instructorReply && <p className="muted">{vi ? 'Giảng viên:' : 'Instructor:'} {r.instructorReply}</p>}
-          </div>
-        </div>
-      ))}
-      {reviews.length === 0 && <p className="muted">{vi ? 'Chưa có đánh giá. Xem rating trước khi mua ở đây.' : 'No reviews yet.'}</p>}
-
-      <QaPanel courseId={course.id} canPost={owned} canAnswer={owned || canTeach} vi={vi} />
     </div>
   )
 }

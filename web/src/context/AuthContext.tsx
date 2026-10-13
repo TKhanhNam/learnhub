@@ -5,6 +5,7 @@ export interface AuthUser {
   username: string
   fullName: string
   role: string
+  emailVerified?: boolean
 }
 
 interface TokenPayload {
@@ -14,11 +15,13 @@ interface TokenPayload {
   role: string
   accessToken: string
   refreshToken: string
+  emailVerified?: boolean
 }
 
 interface AuthContextValue {
   user: AuthUser | null
   login: (data: TokenPayload) => void
+  markEmailVerified: () => void
   logout: () => void
   isAuthenticated: boolean
 }
@@ -50,9 +53,18 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         username: data.username,
         fullName: data.fullName,
         role: data.role,
+        emailVerified: data.emailVerified !== false,
       }
       localStorage.setItem('lh_user', JSON.stringify(authUser))
       setUser(authUser)
+    },
+    markEmailVerified: () => {
+      setUser((current) => {
+        if (!current) return current
+        const next = { ...current, emailVerified: true }
+        localStorage.setItem('lh_user', JSON.stringify(next))
+        return next
+      })
     },
     logout: () => {
       localStorage.removeItem('lh_token')

@@ -10,6 +10,7 @@ public class HelpArticle {
     @Column(nullable = false, length = 200) private String title;
     @Column(nullable = false, columnDefinition = "TEXT") private String body;
     @Column(nullable = false, length = 10) private String locale = "vi";
+    @Column(nullable = false, length = 20) private String audience = "all";
     public Long getId() { return id; }
     public String getSlug() { return slug; }
     public void setSlug(String slug) { this.slug = slug; }
@@ -19,4 +20,6 @@ public class HelpArticle {
     public void setBody(String body) { this.body = body; }
     public String getLocale() { return locale; }
     public void setLocale(String locale) { this.locale = locale; }
+    public String getAudience() { return audience; }
+    public void setAudience(String audience) { this.audience = audience; }
 }

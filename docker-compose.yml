@@ -40,7 +40,7 @@ services:
       - "15672:15672"
 
   minio:
-    image: minio/minio:latest
+    image: pgsty/silo:latest
     container_name: learnhub-minio
     command: server /data --console-address ":9001"
     environment:
@@ -56,6 +56,7 @@ services:
   identity-service:
     build:
       context: .
+      target: single-service
       args:
         SERVICE: identity-service
     environment: &service-env
@@ -74,6 +75,7 @@ services:
   catalog-service:
     build:
       context: .
+      target: single-service
       args:
         SERVICE: catalog-service
     environment: *service-env
@@ -86,6 +88,7 @@ services:
   learning-service:
     build:
       context: .
+      target: single-service
       args:
         SERVICE: learning-service
     environment:
@@ -106,6 +109,7 @@ services:
   content-service:
     build:
       context: .
+      target: single-service
       args:
         SERVICE: content-service
     environment:
@@ -126,6 +130,7 @@ services:
   commerce-service:
     build:
       context: .
+      target: single-service
       args:
         SERVICE: commerce-service
     environment:
@@ -148,6 +153,7 @@ services:
   social-service:
     build:
       context: .
+      target: single-service
       args:
         SERVICE: social-service
     environment:
@@ -169,6 +175,7 @@ services:
   org-service:
     build:
       context: .
+      target: single-service
       args:
         SERVICE: org-service
     environment:
@@ -189,6 +196,7 @@ services:
   assist-service:
     build:
       context: .
+      target: single-service
       args:
         SERVICE: assist-service
     environment:
@@ -208,6 +216,7 @@ services:
   payment-service:
     build:
       context: .
+      target: single-service
       args:
         SERVICE: payment-service
     environment:
@@ -229,6 +238,7 @@ services:
   api-gateway:
     build:
       context: .
+      target: single-service
       args:
         SERVICE: api-gateway
     environment:

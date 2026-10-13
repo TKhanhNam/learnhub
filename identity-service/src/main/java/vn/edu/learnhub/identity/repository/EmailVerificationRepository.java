@@ -7,4 +7,6 @@ import java.util.Optional;
 
 public interface EmailVerificationRepository extends JpaRepository<EmailVerification, Long> {
     Optional<EmailVerification> findByTokenHash(String tokenHash);
+
+    void deleteByUserId(Long userId);
 }

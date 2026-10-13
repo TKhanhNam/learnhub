@@ -81,6 +81,7 @@ public class AuthService {
             securityGuard.humanRejected(request.username(), clientIp);
             throw BusinessException.badRequest("Hay xac nhan ban la nguoi truoc khi dang nhap");
         }
+        securityGuard.assertLoginAllowed(clientIp);
         String login = request.username().trim();
         AppUser user = userRepository.findByUsername(login)
                 .or(() -> userRepository.findByEmailIgnoreCase(login))
@@ -88,6 +89,9 @@ public class AuthService {
 
         if (user == null || !passwordEncoder.matches(request.password(), user.getPasswordHash())) {
             securityGuard.loginFailed(login, clientIp);
+            if (securityGuard.isLocked(clientIp)) {
+                throw BusinessException.forbidden("IP bi khoa 15 phut vi nhap sai mat khau 5 lan trong 10 phut");
+            }
             throw BusinessException.unauthorized("Sai tai khoan hoac mat khau");
         }
         if (user.isLocked()) {
@@ -168,6 +172,11 @@ public class AuthService {
     @Transactional
     public void revokeAllTokens(Long userId) {
         refreshTokenRepository.revokeAllByUserId(userId);
+    }
+
+    @Transactional
+    public AuthDtos.TokenResponse openSession(AppUser user) {
+        return issueTokens(user, null);
     }
 
     private AuthDtos.TokenResponse issueTokens(AppUser user, String devVerifyUrl) {

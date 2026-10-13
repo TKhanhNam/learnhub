@@ -22,13 +22,23 @@ import AdminUsersPage from './admin/AdminUsersPage'
 import AdminRevenuePage from './admin/AdminRevenuePage'
 import AdminAnalyticsPage from './admin/AdminAnalyticsPage'
 import AdminReportsPage from './admin/AdminReportsPage'
+import AdminDeskPage from './admin/AdminDeskPage'
 import AccountPage from './pages/AccountPage'
 import CertificatesPage from './pages/CertificatesPage'
-import AdminAiPage from './admin/AdminAiPage'
+import TermsPage from './pages/TermsPage'
+import FavoritesPage from './pages/FavoritesPage'
+import OrdersPage from './pages/OrdersPage'
+import SellPage from './pages/SellPage'
+import PaymentResultPage from './pages/PaymentResultPage'
+import ForgotPasswordPage from './pages/ForgotPasswordPage'
+import ResetPasswordPage from './pages/ResetPasswordPage'
+import VerifyEmailPage from './pages/VerifyEmailPage'
 import AdminCouponsPage from './admin/AdminCouponsPage'
 import AdminBusinessPage from './admin/AdminBusinessPage'
 import { useI18n } from './context/I18nContext'
 import { useAuth } from './context/AuthContext'
+import AiChatWidget from './components/AiChatWidget'
+import ChatDock from './components/ChatDock'
 
 function NotFound() {
   const { t } = useI18n()
@@ -43,11 +53,13 @@ export default function App() {
   const location = useLocation()
   const { user } = useAuth()
   const isAdminApp = location.pathname.startsWith('/admin')
+  const isAuthScreen = ['/login', '/register', '/forgot-password', '/reset-password', '/verify-email'].includes(location.pathname)
 
   return (
     <>
-      {!isAdminApp && <Navbar />}
-      <div key={location.pathname}>
+      {!isAdminApp && !isAuthScreen && <Navbar />}
+      <div key={location.pathname} className={isAuthScreen ? 'auth-screen' : undefined}>
+        {isAuthScreen && <Link to="/" className="brand auth-brand">LearnHub</Link>}
         <Routes location={location}>
           <Route path="/" element={<HomePage />} />
           <Route path="/shelf" element={<ShelfPage />} />
@@ -56,8 +68,18 @@ export default function App() {
           <Route path="/courses" element={<CoursesPage />} />
           <Route path="/courses/:slug" element={<CourseDetailPage />} />
           <Route path="/help" element={<HelpPage />} />
+          <Route path="/terms" element={<TermsPage />} />
+          <Route path="/favorites" element={<FavoritesPage />} />
+          <Route path="/orders" element={<ProtectedRoute requireVerified><OrdersPage /></ProtectedRoute>} />
+          <Route path="/payment/result" element={<PaymentResultPage />} />
+          <Route path="/sell" element={<SellPage />} />
+          <Route path="/market" element={<Navigate to="/courses" replace />} />
+          <Route path="/messages" element={<Navigate to="/" replace />} />
+          <Route path="/forgot-password" element={<ForgotPasswordPage />} />
+          <Route path="/reset-password" element={<ResetPasswordPage />} />
+          <Route path="/verify-email" element={<VerifyEmailPage />} />
           <Route path="/business" element={<BusinessPage />} />
-          <Route path="/cart" element={<ProtectedRoute><CartPage /></ProtectedRoute>} />
+          <Route path="/cart" element={<ProtectedRoute requireVerified><CartPage /></ProtectedRoute>} />
           <Route path="/learning" element={<ProtectedRoute><LearningPage /></ProtectedRoute>} />
           <Route path="/certificates" element={<ProtectedRoute><CertificatesPage /></ProtectedRoute>} />
           <Route path="/account" element={<ProtectedRoute><AccountPage /></ProtectedRoute>} />
@@ -71,14 +93,16 @@ export default function App() {
             <Route path="revenue" element={<AdminRevenuePage />} />
             <Route path="analytics" element={<AdminAnalyticsPage />} />
             <Route path="coupons" element={<AdminCouponsPage />} />
-            <Route path="ai" element={<AdminAiPage />} />
             <Route path="business" element={<AdminBusinessPage />} />
             <Route path="reports" element={<AdminReportsPage />} />
+            <Route path="desk" element={<AdminDeskPage />} />
           </Route>
           <Route path="*" element={user?.role === 'ADMIN' ? <Navigate to="/admin" replace /> : <NotFound />} />
         </Routes>
       </div>
-      {!isAdminApp && <Footer />}
+      {!isAdminApp && !isAuthScreen && <Footer />}
+      {!isAuthScreen && <ChatDock />}
+      {!isAuthScreen && <AiChatWidget />}
     </>
   )
 }

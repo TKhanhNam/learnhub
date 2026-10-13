@@ -65,11 +65,30 @@ public class JwtAuthFilter extends OncePerRequestFilter {
 
         } catch (Exception ex) {
             SecurityContextHolder.clearContext();
+            if (allowExpiredBearer(request)) {
+                filterChain.doFilter(request, response);
+                return;
+            }
             writeUnauthorized(response);
             return;
         }
 
         filterChain.doFilter(request, response);
+    }
+
+    /** Login/xac thuc email van phai chay khi access token cu het han. */
+    private static boolean allowExpiredBearer(HttpServletRequest request) {
+        String path = request.getRequestURI();
+        if (path == null) {
+            return false;
+        }
+        return path.contains("/auth/verify-email")
+                || path.contains("/auth/login")
+                || path.contains("/auth/register")
+                || path.contains("/auth/forgot-password")
+                || path.contains("/auth/reset-password")
+                || path.contains("/auth/logout")
+                || path.contains("/assist/guest-chat");
     }
 
     private void writeUnauthorized(HttpServletResponse response) throws IOException {

@@ -15,6 +15,7 @@ public final class UserDtos {
             Long id,
             String username,
             String email,
+            String phone,
             String fullName,
             String role,
             boolean locked,
@@ -38,7 +39,14 @@ public final class UserDtos {
             @Size(max = 200, message = "Tieu de gioi thieu toi da 200 ky tu") String headline,
             String bio,
             @Size(max = 400, message = "Duong dan anh toi da 400 ky tu") String avatarUrl,
-            String language) {
+            String language,
+            @Size(max = 20, message = "So dien thoai toi da 20 ky tu") String phone) {
+    }
+
+    public record ChangeEmailRequest(
+            @NotBlank(message = "Email khong duoc de trong")
+            @jakarta.validation.constraints.Email(message = "Email khong dung dinh dang") String email,
+            @NotBlank(message = "Mat khau hien tai khong duoc de trong") String currentPassword) {
     }
 
     public record ChangePasswordRequest(
@@ -56,6 +64,11 @@ public final class UserDtos {
             @Size(max = 1000, message = "Ly do toi da 1000 ky tu") String reason) {
     }
 
+    public record DeleteRequest(
+            @NotBlank(message = "Phai nhap ly do xoa tai khoan")
+            @Size(min = 10, max = 1000, message = "Ly do tu 10 den 1000 ky tu") String reason) {
+    }
+
     public record AdminStatsDTO(
             long totalUsers,
             long students,
@@ -63,6 +76,26 @@ public final class UserDtos {
             long admins,
             long orgAdmins,
             long lockedUsers) {
+    }
+
+    public record KycSubmitRequest(
+            @NotBlank @Size(max = 160) String fullName,
+            @NotBlank @Size(max = 32) String idNumber,
+            @NotBlank @Size(max = 80) String bank,
+            @NotBlank @Size(max = 40) String accountNumber,
+            @NotBlank @Size(max = 160) String accountName) {
+    }
+
+    public record KycDTO(
+            Long userId,
+            String username,
+            String fullName,
+            String idNumber,
+            String bank,
+            String accountNumber,
+            String accountName,
+            String kyc,
+            Instant submittedAt) {
     }
 
     public record MailLogDTO(

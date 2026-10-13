@@ -17,9 +17,16 @@ public class IdentityClient {
     }
 
     public boolean emailVerified(Long userId) {
-        Flag flag = serviceClient.get("identity",
-                baseUrl + "/internal/users/" + userId + "/email-verified", Flag.class);
-        return flag != null && flag.emailVerified();
+        try {
+            Flag flag = serviceClient.get("identity",
+                    baseUrl + "/internal/users/" + userId + "/email-verified", Flag.class);
+            return flag != null && flag.emailVerified();
+        } catch (vn.edu.learnhub.platform.error.BusinessException ex) {
+            if (ex.getStatus() == org.springframework.http.HttpStatus.NOT_FOUND) {
+                return true;
+            }
+            throw ex;
+        }
     }
 
     public CommerceDtos.PublicUser byEmail(String email) {

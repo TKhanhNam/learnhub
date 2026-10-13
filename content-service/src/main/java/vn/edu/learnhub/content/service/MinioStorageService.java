@@ -7,7 +7,7 @@ import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
 import org.springframework.web.multipart.MultipartFile;
-import vn.edu.learnhub.platform.exception.BusinessException;
+import vn.edu.learnhub.platform.error.BusinessException;
 
 import java.io.InputStream;
 import java.util.UUID;

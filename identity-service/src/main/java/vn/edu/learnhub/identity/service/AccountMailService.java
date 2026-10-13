@@ -73,6 +73,24 @@ public class AccountMailService {
         return dispatch(user.getEmail(), subject, body, user.getId());
     }
 
+    public EmailOutbox sendDeleteNotice(AppUser user, String reason, String adminName) {
+        String subject = "Tài khoản LearnHub của bạn đã bị xóa";
+        String when = TIME.format(Instant.now());
+        String body = """
+                <div style="font-family:Segoe UI,Arial,sans-serif;line-height:1.6;color:#1f1f1f">
+                  <h2 style="color:#b91c1c">Tài khoản đã bị xóa</h2>
+                  <p>Xin chào <strong>%s</strong>,</p>
+                  <p>Tài khoản LearnHub (<strong>%s</strong>) đã bị quản trị viên xóa lúc %s.</p>
+                  <p><strong>Lý do:</strong></p>
+                  <p style="background:#fef2f2;border-left:4px solid #b91c1c;padding:12px 16px">%s</p>
+                  <p>Người thực hiện: %s</p>
+                  <p style="color:#5b616b">LearnHub</p>
+                </div>
+                """.formatted(escape(user.getFullName()), escape(user.getUsername()), when,
+                escape(reason), escape(adminName == null ? "Quản trị viên" : adminName));
+        return dispatch(user.getEmail(), subject, body, user.getId());
+    }
+
     public EmailOutbox sendVerification(AppUser user, String verifyUrl) {
         String subject = "Xác thực email LearnHub";
         String body = """
@@ -84,6 +102,20 @@ public class AccountMailService {
                   <p style="color:#5b616b">Nếu bạn không tạo tài khoản này, hãy bỏ qua email.</p>
                 </div>
                 """.formatted(escape(user.getFullName()), escape(verifyUrl), escape(verifyUrl));
+        return dispatch(user.getEmail(), subject, body, user.getId());
+    }
+
+    public EmailOutbox sendPasswordReset(AppUser user, String resetUrl) {
+        String subject = "Đặt lại mật khẩu LearnHub";
+        String body = """
+                <div style="font-family:Segoe UI,Arial,sans-serif;line-height:1.6;color:#1f1f1f">
+                  <h2 style="color:#2563eb">Đặt lại mật khẩu</h2>
+                  <p>Xin chào <strong>%s</strong>,</p>
+                  <p>Mở liên kết dưới đây để đặt mật khẩu mới. Liên kết có hiệu lực 30 phút.</p>
+                  <p><a href="%s" style="color:#2563eb">%s</a></p>
+                  <p style="color:#5b616b">Nếu bạn không yêu cầu đặt lại mật khẩu, hãy bỏ qua email.</p>
+                </div>
+                """.formatted(escape(user.getFullName()), escape(resetUrl), escape(resetUrl));
         return dispatch(user.getEmail(), subject, body, user.getId());
     }
 
@@ -102,18 +134,28 @@ public class AccountMailService {
     }
 
     public boolean smtpConfigured() {
-        return mailHost != null && !mailHost.isBlank();
+        return mailHost != null && !mailHost.isBlank()
+                && mailUsername != null && !mailUsername.isBlank()
+                && mailPassword != null && !mailPassword.isBlank();
     }
 
     public EmailOutbox sendUnlockNotice(AppUser user) {
+        return sendUnlockNotice(user, "Tài khoản của bạn đã được quản trị viên mở khóa.", null);
+    }
+
+    public EmailOutbox sendUnlockNotice(AppUser user, String reason, String adminName) {
         String subject = "Tài khoản LearnHub của bạn đã được mở khóa";
         String body = """
                 <div style="font-family:Segoe UI,Arial,sans-serif;line-height:1.6;color:#1f1f1f">
                   <h2 style="color:#0056d2">Tài khoản đã được mở khóa</h2>
                   <p>Xin chào <strong>%s</strong>,</p>
                   <p>Tài khoản <strong>%s</strong> đã có thể đăng nhập lại trên LearnHub.</p>
+                  <p><strong>Lý do mở khóa:</strong></p>
+                  <p style="background:#f5f7fa;border-left:4px solid #0056d2;padding:12px 16px">%s</p>
+                  <p>Người thực hiện: %s</p>
                 </div>
-                """.formatted(escape(user.getFullName()), escape(user.getUsername()));
+                """.formatted(escape(user.getFullName()), escape(user.getUsername()),
+                escape(reason), escape(adminName == null ? "Quản trị viên" : adminName));
         return dispatch(user.getEmail(), subject, body, user.getId());
     }
 

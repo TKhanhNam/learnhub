@@ -21,6 +21,7 @@ import vn.edu.learnhub.identity.dto.AuthDtos;
 import vn.edu.learnhub.identity.dto.UserDtos;
 import vn.edu.learnhub.identity.service.AuthService;
 import vn.edu.learnhub.identity.service.EmailVerificationService;
+import vn.edu.learnhub.identity.service.PasswordResetService;
 import vn.edu.learnhub.identity.service.UserService;
 import vn.edu.learnhub.platform.api.ApiResponse;
 import vn.edu.learnhub.platform.security.CurrentUser;
@@ -36,6 +37,7 @@ public class AuthController {
     private final AuthService authService;
     private final UserService userService;
     private final EmailVerificationService emailVerificationService;
+    private final PasswordResetService passwordResetService;
 
     @Value("${auth.refresh-cookie-name:learnhub_refresh}")
     private String refreshCookieName;
@@ -44,10 +46,12 @@ public class AuthController {
     private boolean refreshCookieSecure;
 
     public AuthController(AuthService authService, UserService userService,
-                          EmailVerificationService emailVerificationService) {
+                          EmailVerificationService emailVerificationService,
+                          PasswordResetService passwordResetService) {
         this.authService = authService;
         this.userService = userService;
         this.emailVerificationService = emailVerificationService;
+        this.passwordResetService = passwordResetService;
     }
 
     @PostMapping("/register")
@@ -100,10 +104,31 @@ public class AuthController {
                 .body(ApiResponse.ok(null, "Da dang xuat"));
     }
 
+    @PostMapping("/forgot-password")
+    public ApiResponse<Map<String, String>> forgotPassword(
+            @Valid @RequestBody AuthDtos.ForgotPasswordRequest request) {
+        String devUrl = passwordResetService.requestReset(request.email());
+        Map<String, String> data = new LinkedHashMap<>();
+        if (devUrl != null) {
+            data.put("devResetUrl", devUrl);
+        }
+        return ApiResponse.ok(data, "Neu email ton tai, lien ket dat lai mat khau da duoc gui");
+    }
+
+    @PostMapping("/reset-password")
+    public ApiResponse<Void> resetPassword(@Valid @RequestBody AuthDtos.ResetPasswordRequest request) {
+        passwordResetService.reset(request.token(), request.newPassword());
+        return ApiResponse.ok(null, "Da dat lai mat khau, hay dang nhap lai");
+    }
+
     @GetMapping("/verify-email")
-    public ApiResponse<Void> verifyEmail(@RequestParam(required = false) String token) {
-        emailVerificationService.confirm(token);
-        return ApiResponse.ok(null, "Da xac thuc email");
+    public ResponseEntity<ApiResponse<AuthDtos.TokenResponse>> verifyEmail(
+            @RequestParam(required = false) String token) {
+        var user = emailVerificationService.confirm(token);
+        AuthDtos.TokenResponse session = authService.openSession(user);
+        return ResponseEntity.ok()
+                .header(HttpHeaders.SET_COOKIE, buildRefreshCookie(session.refreshToken()).toString())
+                .body(ApiResponse.ok(session, "Da xac thuc email"));
     }
 
     @PostMapping("/resend-verification")

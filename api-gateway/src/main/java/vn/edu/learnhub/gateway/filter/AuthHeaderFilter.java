@@ -39,7 +39,8 @@ public class AuthHeaderFilter implements GlobalFilter, Ordered {
             "/api/social/reviews",
             "/api/social/questions",
             "/api/assist/help",
-            "/api/org/plans"
+            "/api/org/plans",
+            "/api/users/instructors"
     );
 
     @Override

@@ -39,7 +39,7 @@ public class CatalogClient {
     }
 
     public void increaseEnrollment(Long courseId) {
-        serviceClient.post("catalog", baseUrl + "/internal/courses/" + courseId + "/enrollment?delta=1",
+        serviceClient.patch("catalog", baseUrl + "/internal/courses/" + courseId + "/enrollment?delta=1",
                 Map.of("delta", 1), Void.class);
     }
 
