@@ -27,6 +27,7 @@ export DB_USER="${DB_USER:-root}"
 export DB_PASSWORD="${DB_PASSWORD:-nam123}"
 export JWT_SECRET="${JWT_SECRET:-LearnHub-Shared-Secret-Key-2026-Doi-Trong-Moi-Truong-That}"
 export INTERNAL_KEY="${INTERNAL_KEY:-learnhub-internal-key-2026}"
+export DB_SSL="${DB_SSL:-true}"
 
 JAVA_OPTS="-Xms20m -Xmx40m -XX:+UseSerialGC -XX:TieredStopAtLevel=1 -Djava.security.egd=file:/dev/./urandom"
 
