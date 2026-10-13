@@ -24,6 +24,15 @@ public class DataSeeder implements ApplicationRunner {
     private final AppUserRepository userRepository;
     private final PasswordEncoder passwordEncoder;
 
+    @org.springframework.beans.factory.annotation.Value("${SEED_ADMIN_EMAIL:${seed.admin.email:}}")
+    private String seedAdminEmail;
+
+    @org.springframework.beans.factory.annotation.Value("${SEED_ADMIN_PASSWORD:${seed.admin.password:}}")
+    private String seedAdminPassword;
+
+    @org.springframework.beans.factory.annotation.Value("${SEED_ADMIN_NAME:${seed.admin.name:Shop Admin}}")
+    private String seedAdminName;
+
     public DataSeeder(AppUserRepository userRepository, PasswordEncoder passwordEncoder) {
         this.userRepository = userRepository;
         this.passwordEncoder = passwordEncoder;
@@ -33,6 +42,13 @@ public class DataSeeder implements ApplicationRunner {
     public void run(ApplicationArguments args) {
         int created = 0;
         created += ensure("admin", "admin@learnhub.vn", "Quan tri LearnHub", "admin123", Roles.ADMIN, null);
+        created += ensure("tkhanhnam", "tkhanhnam@learnhub.vn", "Thieu Khanh Nam", "admin123", Roles.ADMIN, "Quan tri vien he thong");
+
+        if (seedAdminEmail != null && !seedAdminEmail.isBlank() && seedAdminPassword != null && !seedAdminPassword.isBlank()) {
+            String uName = seedAdminEmail.split("@")[0].replaceAll("[^a-zA-Z0-9_]", "");
+            created += ensure(uName.isBlank() ? "seedadmin" : uName, seedAdminEmail, seedAdminName, seedAdminPassword, Roles.ADMIN, "Admin duoc tao tu bien moi truong");
+        }
+
         created += ensure("teacher1", "teacher1@learnhub.vn", "Nguyen Van Giang", "teacher123", Roles.INSTRUCTOR,
                 "Giang vien Java & Spring Boot");
         created += ensure("teacher2", "teacher2@learnhub.vn", "Tran Thi Thiet Ke", "teacher123", Roles.INSTRUCTOR,
