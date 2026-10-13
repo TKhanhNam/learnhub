@@ -31,13 +31,13 @@ function roleName(role: string | undefined, vi: boolean) {
 function roleHint(role: string | undefined, vi: boolean) {
   if (role === 'ADMIN') {
     return vi
-      ? 'AI Quản trị. Ra lệnh "mở [chức năng]" (tài khoản, duyệt khóa, doanh thu, kyc, coupon, báo cáo...) để AI tự động chuyển trang. Hỏi doanh thu, bảo xuất Excel...'
-      : 'Admin AI. Say "open [feature]" to auto-navigate, or ask for revenue, coupons, and Excel exports.'
+      ? 'AI Quản trị. Ra lệnh "mở [chức năng]" (tài khoản, duyệt khóa, doanh thu, kyc, coupon, báo cáo...) để AI tự động chuyển trang. Yêu cầu xuất báo cáo Excel quản trị sàn...'
+      : 'Admin AI. Say "open [feature]" to auto-navigate, or ask for revenue, coupons, and platform Excel reports.'
   }
   if (role === 'INSTRUCTOR') {
     return vi
-      ? 'AI người bán. Hỏi doanh thu, thực lĩnh, voucher, hồ sơ nhận tiền — sẽ trả số. Bảo xuất Excel thì file tải về.'
-      : 'Seller AI. Ask for payout, vouchers, KYC. Say export Excel to download a file.'
+      ? 'AI người bán. Hỏi doanh thu, thực lĩnh, voucher, hồ sơ nhận tiền — sẽ trả số. Bảo xuất Excel thì tải file báo cáo thu nhập riêng.'
+      : 'Seller AI. Ask for payout, vouchers, KYC. Say export Excel to download your instructor earnings report.'
   }
   if (role === 'ORG_ADMIN') {
     return vi
@@ -47,7 +47,7 @@ function roleHint(role: string | undefined, vi: boolean) {
   if (role === 'STUDENT') {
     return vi
       ? 'AI trợ lý LearnHub. Hỏi tư vấn các sản phẩm khóa học (Lập trình, Tiếng Anh, Thiết kế, Tin học), giỏ hàng, đơn mua, khóa đang học, chứng chỉ...'
-      : 'LearnHub AI Assistant. Ask for course recommendations (Programming, English, Design, Excel), cart, orders, certificates...'
+      : 'LearnHub AI Assistant. Ask for course recommendations (Programming, English, Design, Excel courses), cart, orders, certificates...'
   }
   return vi
     ? 'AI tư vấn LearnHub. Hãy hỏi về các sản phẩm khóa học, lộ trình học tập hoặc chính sách của sàn.'
@@ -113,13 +113,16 @@ export default function AiChatWidget() {
     } catch {
       /* keep local figures */
     }
-    const exportKind = parsed.exportKind || exportFromQuestion(question, user?.role)
+
+    // CHỈ CHO PHÉP XUẤT EXCEL KHI VAI TRÒ LÀ ADMIN HOẶC INSTRUCTOR
+    const isAllowedToExport = user?.role === 'ADMIN' || user?.role === 'INSTRUCTOR'
+    const exportKind = isAllowedToExport ? (parsed.exportKind || exportFromQuestion(question, user?.role)) : null
     let textOut = parsed.text
     if (exportKind) {
       try {
-        textOut = `${textOut}\n${await runExport(exportKind)}`.trim()
+        textOut = `${textOut}\n${await runExport(exportKind, user?.role)}`.trim()
       } catch {
-        textOut = `${textOut}\n${vi ? 'Không xuất được file. Hãy chạy commerce/catalog/identity rồi hỏi lại.' : 'Could not export. Start commerce/catalog/identity and ask again.'}`
+        textOut = `${textOut}\n${vi ? 'Không xuất được file. Hãy kiểm tra kết nối dịch vụ rồi thử lại.' : 'Could not export. Please check service connection and try again.'}`
       }
     }
 

@@ -13,7 +13,13 @@ export async function downloadExcel(url: string, filename: string) {
   saveBlob(blob, filename)
 }
 
-export function downloadRows(filename: string, sheet: string, headers: string[], rows: (string | number)[][]) {
+export interface ExcelSheetData {
+  sheet: string
+  headers: string[]
+  rows: (string | number)[][]
+}
+
+export function downloadWorkbook(filename: string, sheets: ExcelSheetData[]) {
   const esc = (value: string | number) => String(value ?? '')
     .replace(/&/g, '&amp;')
     .replace(/</g, '&lt;')
@@ -22,14 +28,23 @@ export function downloadRows(filename: string, sheet: string, headers: string[],
     const type = typeof value === 'number' ? 'Number' : 'String'
     return `<Cell><Data ss:Type="${type}">${esc(value)}</Data></Cell>`
   }).join('')
+
+  const sheetsXml = sheets.map((s) => `
+<Worksheet ss:Name="${esc(s.sheet)}"><Table>
+<Row>${cells(s.headers)}</Row>
+${s.rows.map((row) => `<Row>${cells(row)}</Row>`).join('')}
+</Table></Worksheet>`).join('')
+
   const xml = `<?xml version="1.0"?>
 <?mso-application progid="Excel.Sheet"?>
 <Workbook xmlns="urn:schemas-microsoft-com:office:spreadsheet" xmlns:ss="urn:schemas-microsoft-com:office:spreadsheet">
-<Worksheet ss:Name="${esc(sheet)}"><Table>
-<Row>${cells(headers)}</Row>
-${rows.map((row) => `<Row>${cells(row)}</Row>`).join('')}
-</Table></Worksheet></Workbook>`
+${sheetsXml}
+</Workbook>`
   saveBlob(new Blob([xml], { type: 'application/vnd.ms-excel' }), filename)
+}
+
+export function downloadRows(filename: string, sheet: string, headers: string[], rows: (string | number)[][]) {
+  downloadWorkbook(filename, [{ sheet, headers, rows }])
 }
 
 function saveBlob(blob: Blob, filename: string) {

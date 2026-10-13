@@ -269,13 +269,14 @@ public class AssistService {
         String securityInstructions;
         if (!"ADMIN".equals(role)) {
             securityInstructions = """
-                    QUY ĐỊNH AN TOÀN BẢO MẬT MCP (BẮT BUỘC TUÂN THỦ):
+                    QUY ĐỊNH AN TOÀN BẢO MẬT MCP VÀ PHÂN QUYỀN (BẮT BUỘC TUÂN THỦ):
                     - Khi người dùng hỏi các câu hỏi quan trọng về:
                       + Hệ thống: máy chủ, backend, microservices, kiến trúc hệ thống, cổng mạng, Docker, mã nguồn, cấu hình env, secret key.
                       + Cơ sở dữ liệu (DB): MySQL, Aiven, tên bảng, cấu trúc schema, câu lệnh SQL, kết nối DB.
                       + Người dùng (User): danh sách tài khoản, mật khẩu, hash, email người khác, số điện thoại, thông tin KYC cá nhân, quyền admin.
                     -> BẠN PHẢI TỪ CHỐI VÀ TRẢ LỜI ĐÚNG:
                     "Tôi không có đủ thẩm quyền để trả lời câu hỏi này theo quy định an toàn hệ thống (MCP Policy). Tôi chỉ có thể hỗ trợ tư vấn các sản phẩm khóa học và giải đáp thông tin học tập trên LearnHub."
+                    - QUY ĐỊNH XUẤT EXCEL: Học viên TUYỆT ĐỐI KHÔNG được xuất file Excel. Nếu học viên yêu cầu xuất file Excel, từ chối và giải thích tính năng xuất Excel chỉ dành cho Giảng viên và Quản trị viên.
                     - Khi người dùng hỏi về sản phẩm, khóa học: Hãy đưa ra một số sản phẩm phù hợp, trò chuyện tư vấn nhiệt tình, trả lời đúng trọng tâm câu hỏi.
                     """;
         } else {
@@ -301,9 +302,9 @@ public class AssistService {
                 %s
                 Ưu tiên khối Số liệu lúc hỏi nếu được hỏi số liệu vận hành.
                 Khi người dùng muốn xuất Excel:
-                quản trị [[EXPORT:revenue]] hoặc [[EXPORT:users]] hoặc [[EXPORT:courses]];
-                người bán [[EXPORT:payout]] hoặc [[EXPORT:courses]] hoặc [[EXPORT:coupons]];
-                người mua [[EXPORT:orders]] hoặc [[EXPORT:courses]] hoặc [[EXPORT:certificates]].
+                - Quản trị viên (ADMIN): file Excel quản trị sàn riêng biệt [[EXPORT:admin_report]] hoặc [[EXPORT:revenue]] hoặc [[EXPORT:users]] hoặc [[EXPORT:courses]];
+                - Giảng viên (INSTRUCTOR): file Excel thu nhập studio riêng biệt [[EXPORT:instructor_report]] hoặc [[EXPORT:payout]] hoặc [[EXPORT:courses]] hoặc [[EXPORT:coupons]];
+                - Học viên (STUDENT/khách): TUYỆT ĐỐI KHÔNG xuất Excel, từ chối rõ ràng và giải thích quyền hạn.
                 Người đang hỏi là %s.
                 Số liệu lúc hỏi:
                 %s
@@ -353,13 +354,16 @@ public class AssistService {
         }
         if (briefing != null && !briefing.isBlank()) {
             String q = fold(question);
-            if (q.contains("excel") || q.contains("xlsx") || q.contains("xuat") || q.contains("bao cao")) {
-                String mark = switch (role == null ? "" : role) {
-                    case "ADMIN" -> (q.contains("tai khoan") ? "[[EXPORT:users]]" : q.contains("khoa") ? "[[EXPORT:courses]]" : "[[EXPORT:revenue]]");
-                    case "INSTRUCTOR" -> (q.contains("voucher") || q.contains("coupon") ? "[[EXPORT:coupons]]" : "[[EXPORT:payout]]");
-                    default -> (q.contains("chung chi") ? "[[EXPORT:certificates]]" : "[[EXPORT:orders]]");
-                };
-                return "Đây là số liệu lúc bạn hỏi.\n" + briefing + "\n" + mark;
+            if (q.contains("excel") || q.contains("xlsx") || q.contains("xuat") || q.contains("bao cao") || q.contains("tai file")) {
+                if ("ADMIN".equals(role)) {
+                    String mark = q.contains("tai khoan") ? "[[EXPORT:users]]" : (q.contains("khoa") ? "[[EXPORT:courses]]" : (q.contains("doanh thu") ? "[[EXPORT:revenue]]" : "[[EXPORT:admin_report]]"));
+                    return "Đây là số liệu quản trị sàn lúc bạn hỏi.\n" + briefing + "\n" + mark;
+                } else if ("INSTRUCTOR".equals(role)) {
+                    String mark = (q.contains("voucher") || q.contains("coupon")) ? "[[EXPORT:coupons]]" : (q.contains("khoa") ? "[[EXPORT:courses]]" : (q.contains("thuc linh") || q.contains("doanh thu") ? "[[EXPORT:payout]]" : "[[EXPORT:instructor_report]]"));
+                    return "Đây là số liệu thu nhập giảng viên lúc bạn hỏi.\n" + briefing + "\n" + mark;
+                } else {
+                    return "Tính năng xuất báo cáo Excel chỉ dành cho Giảng viên và Quản trị viên hệ thống. Học viên không có quyền xuất file Excel. Bạn có thể theo dõi khóa học và đơn hàng trực tiếp trên giao diện website.";
+                }
             }
             if (best == null || bestScore < 8) {
                 return "Số liệu lúc bạn hỏi:\n" + briefing;
@@ -369,8 +373,8 @@ public class AssistService {
             return best.getBody();
         }
         return switch (role == null ? "" : role) {
-            case "ADMIN" -> "Bạn đang dùng AI quản trị. Ra lệnh 'mở [chức năng]' (tài khoản, duyệt khóa, doanh thu, kyc, coupon, báo cáo...) để chuyển trang tự động. Hoặc hỏi doanh thu, coupon, bảo xuất Excel.";
-            case "INSTRUCTOR" -> "Bạn đang dùng AI người bán. Hỏi doanh thu, thực lĩnh, voucher, hồ sơ nhận tiền, người mua đã nhắn, hoặc bảo xuất Excel.";
+            case "ADMIN" -> "Bạn đang dùng AI quản trị. Ra lệnh 'mở [chức năng]' (tài khoản, duyệt khóa, doanh thu, kyc, coupon, báo cáo...) để chuyển trang tự động. Hoặc hỏi doanh thu, coupon, bảo xuất file Excel báo cáo quản trị toàn sàn.";
+            case "INSTRUCTOR" -> "Bạn đang dùng AI người bán. Hỏi doanh thu, thực lĩnh, voucher, hồ sơ nhận tiền, người mua đã nhắn, hoặc bảo xuất file Excel báo cáo thu nhập studio giảng viên.";
             case "ORG_ADMIN" -> "Bạn đang dùng AI người mua cho doanh nghiệp. Hỏi giỏ hàng, đơn, khóa đang học, chứng chỉ, hoặc cấp khóa nhân sự.";
             case "STUDENT" -> "Chào bạn! Mình là AI trợ lý của LearnHub. Bạn có thể hỏi mình tư vấn các sản phẩm khóa học, lộ trình học tập, xem giỏ hàng hoặc chính sách hoàn tiền.";
             default -> "Chào bạn! Mình là AI trợ lý của LearnHub. Bạn có thể hỏi mình tư vấn các sản phẩm khóa học, lộ trình học tập hoặc đăng nhập để quản lý tài khoản.";
@@ -419,7 +423,8 @@ class HelpSeeder implements ApplicationRunner {
         seed("buyer-message", "Nhắn giảng viên", "Trên trang giảng viên hoặc trang khóa, bấm Nhắn giảng viên. Cần đăng nhập. Khung tin nhắn mở ở góc trái.", "vi", "buyer");
         seed("buyer-favorite", "Yêu thích", "Bấm trái tim trên thẻ khóa hoặc trong trang khóa. Danh sách đã lưu nằm ở mục Yêu thích.", "vi", "buyer");
         seed("buyer-pay", "Thanh toán", "Ở giỏ hàng chọn Thanh toán thường để ghi đơn và mở khóa ngay, hoặc MoMo để sang cổng MoMo. Thanh toán lại vẫn dùng đơn cũ.", "vi", "buyer");
-        seed("buyer-orders", "Đơn mua", "Hỏi AI Care để biết đơn gần đây, tổng tiền và mã giảm. Mục Đơn mua vẫn xem đủ danh sách. Bảo xuất Excel thì file tải về.", "vi", "buyer");
+        seed("buyer-orders", "Đơn mua", "Hỏi AI Care để biết đơn gần đây, tổng tiền và mã giảm. Mục Đơn mua xem toàn bộ danh sách đơn hàng đã mua.", "vi", "buyer");
+        seed("buyer-no-excel", "Quy định xuất Excel", "Học viên không có quyền xuất file Excel. Tính năng xuất báo cáo Excel chỉ dành riêng cho Giảng viên và Quản trị viên hệ thống.", "vi", "buyer");
         seed("buyer-live", "Số liệu học", "Hỏi AI Care giỏ hàng còn gì, đang học khóa nào, tiến độ, chứng chỉ. Không cần được chỉ đường nếu số liệu đã có.", "vi", "buyer");
         seed("buyer-learn", "Vào học", "Sau khi đơn đã thanh toán, mở Khóa học của tôi để vào bài giảng.", "vi", "buyer");
         seed("buyer-account", "Tài khoản học viên", "Trong Tài khoản đổi email, số điện thoại và mật khẩu. Quên mật khẩu thì dùng link ở trang đăng nhập.", "vi", "buyer");
@@ -431,7 +436,7 @@ class HelpSeeder implements ApplicationRunner {
         seed("seller-price", "Sửa giá", "Trong Kênh bán sửa giá khóa đang bán. Giá gợi ý là trung bình các khóa cùng danh mục.", "vi", "seller");
         seed("seller-voucher", "Voucher của shop", "Trong Kênh bán tạo mã giảm riêng của shop, gồm phần trăm và số lượng mã.", "vi", "seller");
         seed("seller-kyc", "Nhận tiền", "Gửi hồ sơ xác minh trong Kênh bán. Tiền về ngân hàng sau khi hồ sơ được duyệt. Hỏi AI Care để biết trạng thái hồ sơ, doanh thu và thực lĩnh.", "vi", "seller");
-        seed("seller-live", "Số liệu bán", "Hỏi AI Care doanh thu, phí sàn, thực lĩnh, số suất đã bán, voucher shop. Bảo xuất Excel thì file tải về.", "vi", "seller");
+        seed("seller-live", "Số liệu bán", "Hỏi AI Care doanh thu, phí sàn, thực lĩnh, số suất đã bán, voucher shop. Giảng viên có thể yêu cầu AI xuất file Excel báo cáo thu nhập cá nhân riêng.", "vi", "seller");
         seed("seller-review", "Trả lời đánh giá", "Trong Kênh bán chọn nhận xét của học viên và gửi câu trả lời.", "vi", "seller");
         seed("seller-ads", "Gói quảng cáo", "Kênh bán có gói quảng cáo theo suất. Khi hết suất, nút đăng ký không bấm được nữa.", "vi", "seller");
 
@@ -441,7 +446,7 @@ class HelpSeeder implements ApplicationRunner {
         seed("admin-coupon", "Coupon sàn", "AI Care đếm coupon sàn đang có, phần trăm và lượt đã dùng. Tạo mã mới vẫn ở mục Coupon sàn.", "vi", "admin");
         seed("admin-message", "Nhắn người dùng", "Mở Tin nhắn rồi gõ tên, tài khoản hoặc email. Chỉ người khớp hiện ra. Bấm tên để bắt đầu cuộc trò chuyện.", "vi", "admin");
         seed("admin-desk", "Vận hành", "Mục Vận hành xử lý đơn, duyệt hồ sơ nhận tiền và xem dòng tiền.", "vi", "admin");
-        seed("admin-report", "Báo cáo Excel", "Trong AI Care, bảo xuất Excel doanh thu, tài khoản hoặc khóa học. File tải về máy, không cần vào trang Báo cáo.", "vi", "admin");
+        seed("admin-report", "Báo cáo Excel", "Trong AI Care, quản trị viên có thể yêu cầu AI xuất file Excel báo cáo quản trị toàn sàn (doanh thu sàn, tài khoản người dùng, danh mục khóa học).", "vi", "admin");
         seed("admin-live", "Hỏi số liệu", "Hỏi doanh thu tháng này, có bao nhiêu coupon, khóa chờ duyệt, tài khoản đang khóa. Trợ lý lấy số lúc hỏi, không chỉ đường bấm menu.", "vi", "admin");
         seed("admin-security", "Khóa đăng nhập", "Sai mật khẩu 5 lần trong 10 phút thì địa chỉ IP bị khóa đăng nhập 15 phút.", "vi", "admin");
         seed("admin-business", "Gói Business", "Mục Gói Business xem doanh nghiệp đăng ký và việc cấp khóa cho nhân sự.", "vi", "admin");

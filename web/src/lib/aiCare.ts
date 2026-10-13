@@ -1,11 +1,24 @@
 import axiosClient from '../api/axiosClient'
-import { downloadExcel, downloadRows } from '../admin/adminUtils'
+import { downloadExcel, downloadRows, downloadWorkbook } from '../admin/adminUtils'
 import { adsTaken, adLimit, favorites, ledger, orders as marketOrders, platformVouchers, seller, vouchers } from './buyerStore'
 import { buyersOf } from './inbox'
 
-export type ExportKind = 'revenue' | 'users' | 'courses' | 'payout' | 'orders' | 'coupons' | 'certificates'
+export type ExportKind =
+  | 'admin_report'
+  | 'admin_revenue'
+  | 'admin_users'
+  | 'admin_courses'
+  | 'instructor_report'
+  | 'instructor_payout'
+  | 'instructor_courses'
+  | 'instructor_coupons'
+  | 'revenue'
+  | 'users'
+  | 'courses'
+  | 'payout'
+  | 'coupons'
 
-const EXPORT_MARK = /\[\[EXPORT:(revenue|users|courses|payout|orders|coupons|certificates)\]\]/i
+const EXPORT_MARK = /\[\[EXPORT:(admin_report|admin_revenue|admin_users|admin_courses|instructor_report|instructor_payout|instructor_courses|instructor_coupons|revenue|users|courses|payout|coupons)\]\]/i
 
 function vnd(value: unknown) {
   return Number(value || 0).toLocaleString('vi-VN') + ' đ'
@@ -76,7 +89,7 @@ async function adminBriefing() {
     `Hồ sơ nhận tiền đang lưu trên trình duyệt: ${kyc.fullName || 'trống'} · ${kyc.kyc} · ${kyc.bank} ${kyc.accountNumber}.`,
     `Dòng tiền chợ local: người mua ${vnd(shop.gross)} · phí ${vnd(shop.fee)} · trả shop ${vnd(shop.net)}.`,
     `Voucher demo local của sàn: ${platformVouchers().map((row) => `${row.code} ${row.percent}% ${row.used}/${row.max}`).join(', ') || 'không có'}.`,
-    'Nếu người dùng bảo xuất Excel: thêm dòng [[EXPORT:revenue]] (doanh thu), [[EXPORT:users]] (tài khoản) hoặc [[EXPORT:courses]] (khóa học).',
+    'Nếu người dùng bảo xuất Excel: thêm dòng [[EXPORT:admin_report]] (báo cáo quản trị tổng hợp sàn), hoặc [[EXPORT:revenue]] (doanh thu sàn), [[EXPORT:users]] (tài khoản hệ thống), [[EXPORT:courses]] (danh mục khóa học toàn sàn). File Excel quản trị độc quyền cho Admin.',
   )
 }
 
@@ -107,7 +120,7 @@ async function sellerBriefing(userId?: number) {
     `Quảng cáo: đã dùng ${adsTaken()}/${adLimit()} suất.`,
     `Người mua đã nhắn: ${buyers.length}.`,
     `Voucher local: ${vouchers().map((row) => `${row.code} ${row.percent}%`).join(', ') || 'không có'}. Dòng tiền chợ local: thực lĩnh ${vnd(shop.net)}.`,
-    'Nếu bảo xuất Excel: [[EXPORT:payout]] doanh thu, [[EXPORT:courses]] khóa, [[EXPORT:coupons]] voucher.',
+    'Nếu bảo xuất Excel: thêm dòng [[EXPORT:instructor_report]] (báo cáo thu nhập & studio giảng viên), hoặc [[EXPORT:payout]] (thực lĩnh), [[EXPORT:courses]] (khóa học của tôi), [[EXPORT:coupons]] (voucher shop). File Excel thu nhập độc quyền cho Giảng viên.',
   )
 }
 
@@ -139,7 +152,7 @@ async function buyerBriefing() {
     `Yêu thích local: ${fav.length} khóa.`,
     local.length ? `Đơn chợ local: ${local.length}.` : null,
     'Mã demo sàn LEARNHUB20 giảm 20% ở giỏ hàng.',
-    'Nếu bảo xuất Excel: [[EXPORT:orders]] đơn, [[EXPORT:courses]] khóa đang học, [[EXPORT:certificates]] chứng chỉ.',
+    'QUY ĐỊNH AN TOÀN: Học viên KHÔNG ĐƯỢC xuất file Excel. Nếu học viên yêu cầu xuất Excel, từ chối rõ ràng và giải thích tính năng xuất báo cáo Excel chỉ dành riêng cho Giảng viên và Quản trị viên hệ thống.',
   )
 }
 
@@ -156,101 +169,294 @@ export function stripExport(answer: string) {
   }
 }
 
+export function isExcelRequest(question: string): boolean {
+  const q = fold(question)
+  return /excel|xlsx|xuat file|tai file|xuat bao cao|download file|tai xuong file|xuat excel/.test(q)
+}
+
 export function exportFromQuestion(question: string, role?: string): ExportKind | null {
   const q = fold(question)
   const wants = /excel|xlsx|xuat file|tai file|xuat bao cao|download|gui file/.test(q)
   if (!wants) return null
+
+  // CHỈ ADMIN VÀ INSTRUCTOR ĐƯỢC XUẤT EXCEL
   if (role === 'ADMIN') {
     if (/tai khoan|user|nguoi dung/.test(q)) return 'users'
-    if (/khoa hoc|course/.test(q) && !/doanh thu|ban chay/.test(q)) return 'courses'
-    return 'revenue'
+    if (/khoa hoc|course|kiem duyet/.test(q) && !/doanh thu|ban chay/.test(q)) return 'courses'
+    if (/doanh thu|revenue|tai chinh|tien/.test(q)) return 'revenue'
+    return 'admin_report'
   }
+
   if (role === 'INSTRUCTOR') {
     if (/voucher|coupon|ma giam/.test(q)) return 'coupons'
-    if (/khoa/.test(q) && !/doanh thu|tien/.test(q)) return 'courses'
-    return 'payout'
+    if (/khoa hoc|khoa|course/.test(q) && !/doanh thu|tien|thu nhap/.test(q)) return 'courses'
+    if (/thu nhap|thuc linh|payout|doanh thu|tien/.test(q)) return 'payout'
+    return 'instructor_report'
   }
-  if (/chung chi|certificate/.test(q)) return 'certificates'
-  if (/khoa/.test(q) && !/don/.test(q)) return 'courses'
-  return 'orders'
+
+  // Học viên (STUDENT, ORG_ADMIN, GUEST...) KHÔNG ĐƯỢC XUẤT EXCEL
+  return null
 }
 
-export async function runExport(kind: ExportKind): Promise<string> {
-  if (kind === 'revenue') {
-    await downloadExcel('/api/commerce/admin/export', 'learnhub-doanh-thu.xlsx')
-    return 'Đã tải file Excel doanh thu (learnhub-doanh-thu.xlsx).'
+async function runAdminReport(): Promise<string> {
+  const month = currentMonth()
+  const [analyticsRes, usersRes, coursesRes, orderPageRes, userStatsRes, courseStatsRes] = await Promise.allSettled([
+    axiosClient.get('/api/commerce/admin/analytics'),
+    allPages('/api/users'),
+    axiosClient.get('/api/catalog/courses', { params: { size: 100 } }),
+    axiosClient.get('/api/commerce/admin/orders', { params: { size: 100 } }),
+    axiosClient.get('/api/users/admin/stats'),
+    axiosClient.get('/api/catalog/admin/stats'),
+  ])
+
+  const analytics = analyticsRes.status === 'fulfilled' ? (analyticsRes.value.data?.data as Record<string, unknown>) : null
+  const summary = (analytics?.summary as Record<string, unknown>) || {}
+  const users = usersRes.status === 'fulfilled' ? (usersRes.value as Record<string, unknown>[]) : []
+  const catalogCourses = coursesRes.status === 'fulfilled' ? ((coursesRes.value.data?.data || []) as Record<string, unknown>[]) : []
+  const orders = orderPageRes.status === 'fulfilled' ? ((orderPageRes.value.data?.data || []) as Record<string, unknown>[]) : []
+  const userStats = userStatsRes.status === 'fulfilled' ? (userStatsRes.value.data?.data as Record<string, unknown>) : null
+  const courseStats = courseStatsRes.status === 'fulfilled' ? (courseStatsRes.value.data?.data as Record<string, unknown>) : null
+
+  // Sheet 1: TaiChinh_ToanSan
+  const finRows: (string | number)[][] = [
+    ['Tong doanh thu toan san (Gross)', Number(summary?.revenue || 0), 'VND (Tong cac don hang thanh cong PAID)'],
+    ['Phi hoa hong san (30% Loi nhuan)', Number(summary?.platformFee || 0), 'VND (Doanh thu rong giu lai cho san)'],
+    ['Chi tra cho toan bo giang vien (70%)', Number(summary?.instructorEarn || 0), 'VND (Phan bo cho cac giang vien)'],
+    ['So don hang thanh cong (PAID)', Number(summary?.paidOrders || 0), 'Don hang'],
+    ['So don hang that bai / huy', Number(summary?.failedOrders || 0), 'Don hang'],
+    ['Gia tri don hang trung binh (AOV)', Number(summary?.avgOrder || 0), 'VND/don'],
+    ['Tong so luot khoa hoc da ban', Number(summary?.itemsSold || 0), 'Luot'],
+    ['Thang bao cao', month, 'Thoi diem'],
+  ]
+  if (orders.length > 0) {
+    finRows.push(['', '', ''])
+    finRows.push(['--- DANH SACH DON HANG SAN GAN DAY ---', '', ''])
+    orders.slice(0, 30).forEach((ord) => {
+      finRows.push([`Don #${ord.id} (${ord.status})`, Number(ord.total || 0), `Phi san: ${Number(ord.platformFee || 0)}`])
+    })
   }
-  if (kind === 'users') {
-    try {
-      await downloadExcel('/api/users/admin/export', 'learnhub-tai-khoan.xlsx')
-    } catch {
-      const users = await allPages('/api/users')
-      downloadRows('learnhub-tai-khoan.xls', 'Tai khoan',
-        ['ID', 'Ten dang nhap', 'Email', 'Ho ten', 'Vai tro', 'Khoa'],
-        users.map((user) => [
-          Number(user.id || 0),
-          String(user.username || ''),
-          String(user.email || ''),
-          String(user.fullName || ''),
-          String(user.role || ''),
-          user.locked ? 'Khoa' : 'Hoat dong',
-        ]))
+
+  // Sheet 2: NguoiDung_HeThong
+  const userRows: (string | number)[][] = [
+    ['Thong ke nguoi dung he thong', '', '', '', '', ''],
+    ['Tong so tai khoan', Number(userStats?.totalUsers || users.length), '', '', '', ''],
+    ['Hoc vien (STUDENT)', Number(userStats?.students || 0), '', '', '', ''],
+    ['Giang vien (INSTRUCTOR)', Number(userStats?.instructors || 0), '', '', '', ''],
+    ['Quan tri vien (ADMIN)', Number(userStats?.admins || 0), '', '', '', ''],
+    ['Tai khoan dang bi khoa', Number(userStats?.lockedUsers || 0), '', '', '', ''],
+    ['', '', '', '', '', ''],
+    ['ID', 'Ten dang nhap', 'Email', 'Ho ten', 'Vai tro', 'Trang thai'],
+    ...users.map((u) => [
+      Number(u.id || 0),
+      String(u.username || ''),
+      String(u.email || ''),
+      String(u.fullName || ''),
+      String(u.role || ''),
+      u.locked ? 'Khoa' : 'Hoat dong',
+    ]),
+  ]
+
+  // Sheet 3: KhoaHoc_KiemDuyet
+  const courseRows: (string | number)[][] = [
+    ['Thong ke khoa hoc toan san', '', '', '', ''],
+    ['Tong so khoa hoc', Number(courseStats?.total || catalogCourses.length), '', '', ''],
+    ['Khoa hoc cho xet duyet (PENDING)', Number(courseStats?.pending || 0), '', '', ''],
+    ['Khoa hoc da xuat ban (PUBLISHED)', Number(courseStats?.published || 0), '', '', ''],
+    ['Tong luot hoc vien ghi danh', Number(courseStats?.enrollments || 0), '', '', ''],
+    ['', '', '', '', ''],
+    ['ID', 'Tieu de khoa hoc', 'Gia niem yet', 'Trang thai duyet', 'Hoc vien'],
+    ...catalogCourses.map((c) => [
+      Number(c.id || 0),
+      String(c.title || ''),
+      Number(c.price || 0),
+      String(c.status || ''),
+      Number(c.enrollmentCount || 0),
+    ]),
+  ]
+
+  downloadWorkbook('learnhub-admin-quan-tri.xls', [
+    { sheet: 'TaiChinh_ToanSan', headers: ['Chi so tai chinh san', 'Gia tri', 'Ghi chu / Don vi'], rows: finRows },
+    { sheet: 'NguoiDung_HeThong', headers: ['ID', 'Ten dang nhap', 'Email', 'Ho ten', 'Vai tro', 'Trang thai'], rows: userRows },
+    { sheet: 'KhoaHoc_KiemDuyet', headers: ['ID', 'Tieu de khoa hoc', 'Gia', 'Trang thai', 'Hoc vien'], rows: courseRows },
+  ])
+
+  return 'Đã xuất tệp Excel Báo cáo Quản trị Toàn sàn (learnhub-admin-quan-tri.xls) dành riêng cho Quản trị viên.'
+}
+
+async function runInstructorReport(): Promise<string> {
+  const [payoutRes, studioRes, couponRes] = await Promise.allSettled([
+    axiosClient.get('/api/commerce/instructor/payouts'),
+    axiosClient.get('/api/catalog/instructor/courses'),
+    axiosClient.get('/api/catalog/coupons'),
+  ])
+
+  const d = payoutRes.status === 'fulfilled' ? (payoutRes.value.data?.data as Record<string, unknown> || {}) : {}
+  const studio = studioRes.status === 'fulfilled' ? ((studioRes.value.data?.data || []) as Record<string, unknown>[]) : []
+  const coupons = couponRes.status === 'fulfilled' ? ((couponRes.value.data?.data || []) as Record<string, unknown>[]) : []
+  const kyc = seller()
+
+  // Sheet 1: ThuNhap_Studio
+  const earnRows: (string | number)[][] = [
+    ['Doanh thu ban khoa hoc cua toi (Gross)', Number(d.gross || 0), 'VND (Doanh thu tu hoc vien mua khoa cua ban)'],
+    ['Phi nen tang khau tru (30% san)', Number(d.platformFee || 0), 'VND (Chi phi ha tang & van hanh san)'],
+    ['Thuc linh cua giang vien (Net 70%)', Number(d.net || 0), 'VND (So tien thuc ve tai khoan ngan hang)'],
+    ['So luot hoc vien da mua khoa', Number(d.orderItemCount || 0), 'Suat hoc vien da thanh toan'],
+    ['', '', ''],
+    ['--- THONG TIN TAI KHOAN NHAN TIEN ---', '', ''],
+    ['Chu tai khoan ngan hang', String(kyc.accountName || kyc.fullName || 'Chua cap nhat'), 'Nguoi thu huong'],
+    ['So tai khoan ngan hang', String(kyc.accountNumber || 'Chua cap nhat'), 'STK'],
+    ['Ngan hang thu huong', String(kyc.bank || 'Chua cap nhat'), 'Ngan hang'],
+    ['Trang thai xac minh KYC', String(kyc.kyc || 'Chua xac minh'), 'Ho so thanh toan'],
+    ['Thoi diem xuat file', new Date().toLocaleString('vi-VN'), 'Ngay tao bao cao'],
+  ]
+
+  // Sheet 2: KhoaHoc_CuaToi
+  const myCourseRows: (string | number)[][] = studio.map((c) => [
+    String(c.title || ''),
+    String(c.status || ''),
+    Number(c.price || 0),
+    Number(c.enrollmentCount || 0),
+  ])
+
+  // Sheet 3: Voucher_CuaShop
+  const myCouponRows: (string | number)[][] = coupons.map((cp) => [
+    String(cp.code || ''),
+    `${cp.discountPercent || 0}%`,
+    Number(cp.usedCount || 0),
+    Number(cp.maxUses || 0),
+    cp.active ? 'Hieu luc' : 'Het han / Tam dung',
+  ])
+
+  downloadWorkbook('learnhub-giang-vien-thu-nhap.xls', [
+    { sheet: 'ThuNhap_Studio', headers: ['Chi so thu nhap giang vien', 'Gia tri', 'Giai thich'], rows: earnRows },
+    { sheet: 'KhoaHoc_CuaToi', headers: ['Tieu de khoa hoc Studio', 'Trang thai', 'Gia niem yet', 'Hoc vien dang ky'], rows: myCourseRows },
+    { sheet: 'Voucher_CuaShop', headers: ['Ma voucher', 'Phan tram giam', 'Da dung', 'Toi da', 'Hieu luc'], rows: myCouponRows },
+  ])
+
+  return 'Đã xuất tệp Excel Báo cáo Thu nhập & Khóa học Studio (learnhub-giang-vien-thu-nhap.xls) dành riêng cho Giảng viên.'
+}
+
+export async function runExport(kind: ExportKind, role?: string): Promise<string> {
+  // BẢO VỆ TUYỆT ĐỐI: CHỈ ADMIN VÀ INSTRUCTOR ĐƯỢC XUẤT EXCEL
+  if (role !== 'ADMIN' && role !== 'INSTRUCTOR') {
+    return 'Tính năng xuất báo cáo Excel chỉ dành cho Giảng viên và Quản trị viên hệ thống. Học viên không có quyền xuất file Excel.'
+  }
+
+  // VAI TRÒ ADMIN
+  if (role === 'ADMIN') {
+    if (kind === 'admin_report') {
+      return runAdminReport()
     }
-    return 'Đã tải file Excel tài khoản.'
+    if (kind === 'revenue' || kind === 'admin_revenue') {
+      try {
+        await downloadExcel('/api/commerce/admin/export', 'learnhub-admin-doanh-thu.xlsx')
+        return 'Đã tải file Excel Doanh thu toàn sàn (learnhub-admin-doanh-thu.xlsx) cho Admin.'
+      } catch {
+        const res = await axiosClient.get('/api/commerce/admin/analytics').catch(() => null)
+        const s = (res?.data?.data as Record<string, unknown>)?.summary as Record<string, unknown> || {}
+        downloadRows('learnhub-admin-doanh-thu.xls', 'DoanhThu_Admin',
+          ['Chi so doanh thu toan san', 'Gia tri (VND)'],
+          [
+            ['Tong doanh thu toan san (Gross)', Number(s.revenue || 0)],
+            ['Phi hoa hong san thu ve (30%)', Number(s.platformFee || 0)],
+            ['Tong chi tra giang vien (70%)', Number(s.instructorEarn || 0)],
+            ['So don thanh cong (PAID)', Number(s.paidOrders || 0)],
+            ['Gia tri don trung binh', Number(s.avgOrder || 0)],
+          ])
+        return 'Đã tải file Excel Doanh thu toàn sàn (learnhub-admin-doanh-thu.xls) cho Admin.'
+      }
+    }
+    if (kind === 'users' || kind === 'admin_users') {
+      try {
+        await downloadExcel('/api/users/admin/export', 'learnhub-admin-tai-khoan.xlsx')
+        return 'Đã tải file Excel Tài khoản hệ thống (learnhub-admin-tai-khoan.xlsx) cho Admin.'
+      } catch {
+        const users = await allPages('/api/users')
+        downloadRows('learnhub-admin-tai-khoan.xls', 'TaiKhoan_Admin',
+          ['ID', 'Ten dang nhap', 'Email', 'Ho ten', 'Vai tro', 'Khoa'],
+          users.map((user) => [
+            Number(user.id || 0),
+            String(user.username || ''),
+            String(user.email || ''),
+            String(user.fullName || ''),
+            String(user.role || ''),
+            user.locked ? 'Khoa' : 'Hoat dong',
+          ]))
+        return 'Đã tải file Excel Tài khoản hệ thống (learnhub-admin-tai-khoan.xls) cho Admin.'
+      }
+    }
+    if (kind === 'courses' || kind === 'admin_courses') {
+      try {
+        await downloadExcel('/api/catalog/admin/export', 'learnhub-admin-khoa-hoc.xlsx')
+        return 'Đã tải file Excel Danh mục & Kiểm duyệt Khóa học (learnhub-admin-khoa-hoc.xlsx) cho Admin.'
+      } catch {
+        const catalog = await axiosClient.get('/api/catalog/courses', { params: { size: 100 } }).then((res) => res.data?.data || []).catch(() => [])
+        downloadRows('learnhub-admin-khoa-hoc.xls', 'KiemDuyet_Admin',
+          ['ID', 'Tieu de khoa hoc', 'Gia niem yet', 'Trang thai duyet', 'Hoc vien'],
+          catalog.map((c: Record<string, unknown>) => [
+            Number(c.id || 0),
+            String(c.title || ''),
+            Number(c.price || 0),
+            String(c.status || ''),
+            Number(c.enrollmentCount || 0),
+          ]))
+        return 'Đã tải file Excel Danh mục & Kiểm duyệt Khóa học (learnhub-admin-khoa-hoc.xls) cho Admin.'
+      }
+    }
+    return runAdminReport()
   }
-  if (kind === 'courses') {
-    try {
-      await downloadExcel('/api/catalog/admin/export', 'learnhub-khoa-hoc.xlsx')
-      return 'Đã tải file Excel khóa học.'
-    } catch {
-      const mine = await axiosClient.get('/api/learning/my-courses').then((res) => res.data.data || []).catch(() => [])
-      const studio = await axiosClient.get('/api/catalog/instructor/courses').then((res) => res.data.data || []).catch(() => [])
-      const rows = (studio.length ? studio : mine) as Record<string, unknown>[]
-      downloadRows('learnhub-khoa-hoc.xls', 'Khoa hoc',
-        ['Tieu de', 'Trang thai / tien do', 'Gia'],
-        rows.map((row) => [
-          String(row.title || row.courseTitle || ''),
-          String(row.status || `${row.progressPercent || 0}%`),
+
+  // VAI TRÒ GIẢNG VIÊN (INSTRUCTOR)
+  if (role === 'INSTRUCTOR') {
+    if (kind === 'instructor_report') {
+      return runInstructorReport()
+    }
+    if (kind === 'payout' || kind === 'instructor_payout') {
+      const d = (await axiosClient.get('/api/commerce/instructor/payouts')).data.data || {}
+      const kyc = seller()
+      downloadRows('learnhub-giang-vien-thuc-linh.xls', 'ThucLinh_GiangVien',
+        ['Chi so thu nhap ca nhan', 'Gia tri', 'Ghi chu'],
+        [
+          ['Doanh thu ban khoa hoc cua toi', Number(d.gross || 0), 'VND'],
+          ['Phi san khau tru (30%)', Number(d.platformFee || 0), 'VND'],
+          ['Thuc linh cua giang vien (70%)', Number(d.net || 0), 'VND'],
+          ['So luot hoc vien da mua', Number(d.orderItemCount || 0), 'Suat'],
+          ['Chu tai khoan ngan hang', String(kyc.accountName || kyc.fullName || 'Chua cap nhat'), ''],
+          ['So tai khoan ngan hang', String(kyc.accountNumber || 'Chua cap nhat'), ''],
+          ['Ngan hang', String(kyc.bank || 'Chua cap nhat'), ''],
+          ['Trang thai KYC', String(kyc.kyc || 'Chua xac minh'), ''],
+        ])
+      return 'Đã tải file Excel Thu nhập thực lĩnh cá nhân (learnhub-giang-vien-thuc-linh.xls) cho Giảng viên.'
+    }
+    if (kind === 'courses' || kind === 'instructor_courses') {
+      const studio = await axiosClient.get('/api/catalog/instructor/courses').then((res) => res.data?.data || []).catch(() => [])
+      downloadRows('learnhub-giang-vien-khoa-hoc-studio.xls', 'KhoaHoc_Studio',
+        ['Tieu de khoa hoc Studio', 'Trang thai', 'Gia niem yet', 'Hoc vien'],
+        studio.map((row: Record<string, unknown>) => [
+          String(row.title || ''),
+          String(row.status || ''),
           Number(row.price || 0),
+          Number(row.enrollmentCount || 0),
         ]))
-      return 'Đã tải file Excel khóa học.'
+      return 'Đã tải file Excel Khóa học Studio của Giảng viên (learnhub-giang-vien-khoa-hoc-studio.xls).'
     }
+    if (kind === 'coupons' || kind === 'instructor_coupons') {
+      const rows = (await axiosClient.get('/api/catalog/coupons')).data?.data || []
+      downloadRows('learnhub-giang-vien-voucher.xls', 'Voucher_GiangVien',
+        ['Ma voucher', 'Phan tram giam', 'Da dung', 'Toi da', 'Hieu luc'],
+        rows.map((row: Record<string, unknown>) => [
+          String(row.code || ''),
+          `${row.discountPercent || 0}%`,
+          Number(row.usedCount || 0),
+          Number(row.maxUses || 0),
+          row.active ? 'Hieu luc' : 'Het han',
+        ]))
+      return 'Đã tải file Excel Voucher cá nhân (learnhub-giang-vien-voucher.xls) cho Giảng viên.'
+    }
+    return runInstructorReport()
   }
-  if (kind === 'payout') {
-    const d = (await axiosClient.get('/api/commerce/instructor/payouts')).data.data
-    downloadRows('learnhub-doanh-thu-giang-vien.xls', 'Doanh thu',
-      ['Chi so', 'Gia tri'],
-      [
-        ['Doanh thu', Number(d.gross || 0)],
-        ['Phi san', Number(d.platformFee || 0)],
-        ['Thuc linh', Number(d.net || 0)],
-        ['So suat ban', Number(d.orderItemCount || 0)],
-      ])
-    return 'Đã tải file Excel doanh thu giảng viên.'
-  }
-  if (kind === 'coupons') {
-    const rows = (await axiosClient.get('/api/catalog/coupons')).data.data || []
-    downloadRows('learnhub-voucher.xls', 'Voucher',
-      ['Ma', 'Phan tram', 'Da dung', 'Toi da', 'Hieu luc'],
-      rows.map((row: { code: string; discountPercent: number; usedCount: number; maxUses: number; active: boolean }) => [
-        row.code, row.discountPercent, row.usedCount || 0, row.maxUses || 0, row.active ? 'co' : 'khong',
-      ]))
-    return 'Đã tải file Excel voucher.'
-  }
-  if (kind === 'certificates') {
-    const rows = (await axiosClient.get('/api/learning/certificates')).data.data || []
-    downloadRows('learnhub-chung-chi.xls', 'Chung chi',
-      ['Khoa hoc', 'Ma'],
-      rows.map((row: { courseTitle?: string; code?: string }) => [String(row.courseTitle || ''), String(row.code || '')]))
-    return 'Đã tải file Excel chứng chỉ.'
-  }
-  const rows = (await axiosClient.get('/api/commerce/orders', { params: { size: 50 } })).data.data || []
-  downloadRows('learnhub-don-mua.xls', 'Don mua',
-    ['ID', 'Trang thai', 'Tong', 'Ma giam'],
-    rows.map((row: { id: number; status: string; total: number; couponCode?: string }) => [
-      row.id, row.status, Number(row.total || 0), String(row.couponCode || ''),
-    ]))
-  return 'Đã tải file Excel đơn mua.'
+
+  return 'Tính năng xuất báo cáo Excel chỉ dành cho Giảng viên và Quản trị viên hệ thống. Học viên không có quyền xuất file Excel.'
 }
 
 async function allPages(url: string) {
@@ -454,7 +660,17 @@ export function pickAnswer(aiText: string, question: string, briefing: string, r
     }
   }
 
-  // 2. Kiem tra lenh dieu huong Admin
+  // 2. Chặn xuất Excel đối với học viên và khách (chỉ Giảng viên và Admin được phép)
+  if (role !== 'ADMIN' && role !== 'INSTRUCTOR' && isExcelRequest(question)) {
+    return {
+      text: vi
+        ? 'Tính năng xuất báo cáo Excel chỉ dành cho Giảng viên và Quản trị viên hệ thống. Học viên không có quyền xuất file Excel. Bạn có thể theo dõi khóa học, đơn hàng và chứng chỉ trực tiếp trên giao diện website.'
+        : 'Excel export is restricted to Instructors and Administrators only. Learners do not have permission to export Excel reports.',
+      exportKind: null,
+    }
+  }
+
+  // 3. Kiem tra lenh dieu huong Admin
   if (role === 'ADMIN') {
     const nav = detectAdminNav(question, role, vi)
     if (nav) {
@@ -462,12 +678,16 @@ export function pickAnswer(aiText: string, question: string, briefing: string, r
     }
   }
 
-  // 3. Kiem tra cau hoi san pham
+  // 4. Kiem tra cau hoi san pham
   if (isProductQuestion(question)) {
     return { text: consultProducts(question, vi), exportKind: null }
   }
 
   const parsed = stripExport(aiText)
+  // Xóa bỏ exportKind nếu người dùng không phải Admin hoặc Giảng viên
+  if (role !== 'ADMIN' && role !== 'INSTRUCTOR') {
+    parsed.exportKind = null
+  }
   if (!isDataQuestion(question)) return parsed
   const hasNumber = /\d/.test(parsed.text)
   if (hasNumber && !looksLikeDirections(parsed.text)) return parsed
@@ -482,7 +702,14 @@ export function localAnswer(question: string, briefing: string, role?: string, v
       : 'I do not have authorization to answer this question per MCP security policies.'
   }
 
-  // 2. Kiem tra lenh dieu huong Admin
+  // 2. Chặn xuất Excel đối với học viên và khách (chỉ Giảng viên và Admin được phép)
+  if (role !== 'ADMIN' && role !== 'INSTRUCTOR' && isExcelRequest(question)) {
+    return vi
+      ? 'Tính năng xuất báo cáo Excel chỉ dành cho Giảng viên và Quản trị viên hệ thống. Học viên không có quyền xuất file Excel. Bạn có thể theo dõi khóa học, đơn hàng và chứng chỉ trực tiếp trên giao diện website.'
+      : 'Excel export is restricted to Instructors and Administrators only. Learners do not have permission to export Excel reports.'
+  }
+
+  // 3. Kiem tra lenh dieu huong Admin
   if (role === 'ADMIN') {
     const nav = detectAdminNav(question, role, vi)
     if (nav) {
@@ -490,28 +717,28 @@ export function localAnswer(question: string, briefing: string, role?: string, v
     }
   }
 
-  // 3. Kiem tra tu van san pham
+  // 4. Kiem tra tu van san pham
   if (isProductQuestion(question)) {
     return consultProducts(question, vi)
   }
 
-  // 4. Tra cuu so lieu he thong
+  // 5. Tra cuu so lieu he thong
   const dataAsk = isDataQuestion(question)
   if (dataAsk && briefing) {
     return vi
-      ? `Số liệu lấy lúc bạn hỏi:\n${briefing.replace(/Nếu người dùng[\s\S]*$/, '').replace(/Nếu bảo xuất[\s\S]*$/, '').trim()}`
+      ? `Số liệu lấy lúc bạn hỏi:\n${briefing.replace(/Nếu người dùng[\s\S]*$/, '').replace(/Nếu bảo xuất[\s\S]*$/, '').replace(/QUY ĐỊNH AN TOÀN[\s\S]*$/, '').trim()}`
       : `Live figures from this moment:\n${briefing}`
   }
 
   if (role === 'ADMIN') {
     return vi
-      ? 'Bạn đang dùng AI quản trị. Ra lệnh "mở [chức năng]" (tài khoản, duyệt khóa, doanh thu, kyc, coupon, báo cáo...) để AI tự động chuyển trang. Hoặc hỏi doanh thu, coupon, bảo xuất Excel.'
-      : 'Admin AI. Say "open [feature]" to auto-navigate, or ask for revenue, coupons, and Excel exports.'
+      ? 'Bạn đang dùng AI quản trị. Ra lệnh "mở [chức năng]" (tài khoản, duyệt khóa, doanh thu, kyc, coupon, báo cáo...) để AI tự động chuyển trang. Hoặc hỏi doanh thu, coupon, bảo xuất file Excel báo cáo quản trị toàn sàn.'
+      : 'Admin AI. Say "open [feature]" to auto-navigate, or ask for revenue, coupons, and platform Excel reports.'
   }
   if (role === 'INSTRUCTOR') {
     return vi
-      ? 'Hãy hỏi doanh thu, thực lĩnh, voucher, hồ sơ nhận tiền, người mua đã nhắn, hoặc bảo xuất Excel.'
-      : 'Ask for payout, vouchers, KYC, buyers who messaged you, or an Excel export.'
+      ? 'Hãy hỏi doanh thu, thực lĩnh, voucher, hồ sơ nhận tiền, người mua đã nhắn, hoặc bảo xuất file Excel báo cáo thu nhập studio giảng viên.'
+      : 'Ask for payout, vouchers, KYC, buyers who messaged you, or an instructor studio Excel export.'
   }
   return vi
     ? 'Chào bạn! Mình là AI trợ lý của LearnHub. Bạn có thể hỏi mình tư vấn các sản phẩm khóa học, lộ trình học tập, xem giỏ hàng hoặc chính sách hoàn tiền.'
