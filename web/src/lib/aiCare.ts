@@ -266,9 +266,176 @@ async function allPages(url: string) {
   return rows
 }
 
+export const NAV_MARK = /\[\[NAV:(\/[a-zA-Z0-9\-_/]*)\]\]/i
+
+export function stripNav(text: string) {
+  const match = text.match(NAV_MARK)
+  return {
+    text: text.replace(NAV_MARK, '').replace(/\n{3,}/g, '\n\n').trim(),
+    navPath: match ? match[1] : null,
+  }
+}
+
+export function labelForNav(path: string, vi = true): string {
+  switch (path) {
+    case '/admin': return vi ? 'Tổng quan' : 'Overview'
+    case '/admin/courses': return vi ? 'Duyệt khóa học' : 'Review Courses'
+    case '/admin/users': return vi ? 'Quản lý tài khoản' : 'Manage Accounts'
+    case '/admin/revenue': return vi ? 'Doanh thu sàn' : 'Platform Revenue'
+    case '/admin/analytics': return vi ? 'Phân tích' : 'Analytics'
+    case '/admin/coupons': return vi ? 'Coupon sàn' : 'Platform Coupons'
+    case '/admin/business': return vi ? 'Gói Business' : 'Business Plans'
+    case '/admin/reports': return vi ? 'Báo cáo Excel' : 'Excel Reports'
+    case '/admin/desk': return vi ? 'Bàn vận hành & KYC' : 'Operations Desk & KYC'
+    case '/': return vi ? 'Trang chủ học viên' : 'Learner Home'
+    default: return vi ? 'Chức năng' : 'Feature'
+  }
+}
+
+export function detectAdminNav(question: string, role?: string, vi = true): { path: string; label: string; text: string } | null {
+  if (role !== 'ADMIN') return null
+  const q = fold(question)
+  const isCommand = /mo|vao|chuyen|bat|xem|di den|open|goto|navigate|link|truy cap|den muc/.test(q)
+
+  if (/tai khoan|user|nguoi dung|hoc vien|giang vien|khoa tai khoan|mo khoa/.test(q)) {
+    return {
+      path: '/admin/users',
+      label: vi ? 'Quản lý tài khoản' : 'Manage Accounts',
+      text: vi
+        ? 'Đã tự động mở chức năng Quản lý tài khoản (/admin/users) cho bạn.'
+        : 'Navigating to Manage Accounts (/admin/users)...',
+    }
+  }
+  if (/duyet khoa|khoa cho duyet|xet duyet|khoa hoc|courses/.test(q) && !/doanh thu|ban chay/.test(q)) {
+    return {
+      path: '/admin/courses',
+      label: vi ? 'Duyệt khóa học' : 'Review Courses',
+      text: vi
+        ? 'Đã tự động mở chức năng Duyệt khóa học (/admin/courses) cho bạn.'
+        : 'Navigating to Review Courses (/admin/courses)...',
+    }
+  }
+  if ((/doanh thu|revenue|tai chinh|thu nhap|tien san/.test(q) && isCommand) || /trang doanh thu|muc doanh thu/.test(q)) {
+    return {
+      path: '/admin/revenue',
+      label: vi ? 'Doanh thu sàn' : 'Platform Revenue',
+      text: vi
+        ? 'Đã tự động mở chức năng Doanh thu sàn (/admin/revenue) cho bạn.'
+        : 'Navigating to Platform Revenue (/admin/revenue)...',
+    }
+  }
+  if (/phan tich|analytics|bieu do|thong ke|chart/.test(q)) {
+    return {
+      path: '/admin/analytics',
+      label: vi ? 'Phân tích' : 'Analytics',
+      text: vi
+        ? 'Đã tự động mở chức năng Phân tích số liệu (/admin/analytics) cho bạn.'
+        : 'Navigating to Analytics (/admin/analytics)...',
+    }
+  }
+  if ((/coupon|voucher|ma giam|khuyen mai/.test(q) && isCommand) || /trang coupon|muc coupon/.test(q)) {
+    return {
+      path: '/admin/coupons',
+      label: vi ? 'Coupon sàn' : 'Platform Coupons',
+      text: vi
+        ? 'Đã tự động mở chức năng Coupon sàn (/admin/coupons) cho bạn.'
+        : 'Navigating to Platform Coupons (/admin/coupons)...',
+    }
+  }
+  if (/business|doanh nghiep|to chuc|b2b/.test(q)) {
+    return {
+      path: '/admin/business',
+      label: vi ? 'Gói Business' : 'Business Plans',
+      text: vi
+        ? 'Đã tự động mở chức năng Gói Business (/admin/business) cho bạn.'
+        : 'Navigating to Business Plans (/admin/business)...',
+    }
+  }
+  if ((/bao cao|reports/.test(q) && isCommand) || /trang bao cao|trang reports/.test(q)) {
+    return {
+      path: '/admin/reports',
+      label: vi ? 'Báo cáo Excel' : 'Excel Reports',
+      text: vi
+        ? 'Đã tự động mở chức năng Báo cáo Excel (/admin/reports) cho bạn.'
+        : 'Navigating to Excel Reports (/admin/reports)...',
+    }
+  }
+  if (/van hanh|desk|kyc|ho so|xac minh|rut tien|payout/.test(q)) {
+    return {
+      path: '/admin/desk',
+      label: vi ? 'Bàn vận hành & KYC' : 'Operations Desk & KYC',
+      text: vi
+        ? 'Đã tự động mở chức năng Bàn vận hành & Duyệt KYC (/admin/desk) cho bạn.'
+        : 'Navigating to Operations Desk & KYC (/admin/desk)...',
+    }
+  }
+  if (/tong quan|dashboard|overview|trang chu admin|bang dieu khien/.test(q)) {
+    return {
+      path: '/admin',
+      label: vi ? 'Tổng quan' : 'Overview',
+      text: vi
+        ? 'Đã tự động chuyển về trang Tổng quan quản trị (/admin) cho bạn.'
+        : 'Navigating to Admin Overview (/admin)...',
+    }
+  }
+  if (/trang hoc vien|trang chu|trang mua|learner/.test(q) && isCommand) {
+    return {
+      path: '/',
+      label: vi ? 'Trang chủ học viên' : 'Learner Home',
+      text: vi
+        ? 'Đã tự động chuyển về Trang chủ học viên cho bạn.'
+        : 'Navigating to Learner Home...',
+    }
+  }
+  return null
+}
+
+export function isMcpRestricted(question: string): boolean {
+  const q = fold(question)
+  const systemKeywords = /he thong|system|backend|server|may chu|microservice|kien truc|architecture|docker|kubernetes|nginx|port|cong ket noi|ma nguon|source code|cau hinh|config|env|secret|internal key|jwt/
+  const dbKeywords = /co so du lieu|database|csdl|\bdb\b|sql|mysql|aiven|table|bang du lieu|schema|query|flyway|ket noi db/
+  const userKeywords = /thong tin user|danh sach user|mat khau|password|hash|email nguoi dung|sdt|phone|cccd|thong tin kyc|admin account|tai khoan admin|tai khoan nguoi khac/
+  const exploitKeywords = /hack|bypass|exploit|phan quyen admin|trao quyen admin|dump data/
+
+  return systemKeywords.test(q) || dbKeywords.test(q) || userKeywords.test(q) || exploitKeywords.test(q)
+}
+
+export function isProductQuestion(question: string): boolean {
+  const q = fold(question)
+  return /san pham|khoa hoc|lap trinh|tieng anh|ngoai ngu|thiet ke|tin hoc|excel|marketing|goi y|tu van|muon hoc|nen hoc|co khoa nao|gia bao nhieu|de xuat|course|product|ban chay/.test(q)
+}
+
+export function consultProducts(question: string, vi = true): string {
+  const q = fold(question)
+  if (/lap trinh|developer|coding|java|spring|react|python|web/.test(q)) {
+    return vi
+      ? `Chào bạn! Về mảng Lập trình, LearnHub xin tư vấn các sản phẩm khóa học chất lượng hàng đầu:\n\n1. Java cơ bản cho người mới (Giảng viên: Mai Lan) - 499.000 đ [Cơ bản]\n→ Khóa nhập môn toàn diện: cú pháp, vòng lặp, hướng đối tượng (OOP) và bài tập thực hành cuối mỗi chương.\n\n2. Spring Boot thực hành chuyên sâu (Giảng viên: Trần Khoa) - 890.000 đ [Nâng cao]\n→ Xây dựng RESTful API, Spring Security, phân quyền người dùng và kết nối cơ sở dữ liệu doanh nghiệp.\n\n3. SQL truy vấn dữ liệu (Giảng viên: Lê Hà) - 540.000 đ [Trung cấp]\n→ Thành thạo SELECT, JOIN, nhóm và tối ưu hóa xử lý bảng dữ liệu thực tế.\n\nBạn đang muốn bắt đầu từ con số 0 hay nâng cao để đi làm, hãy chia sẻ để mình tư vấn chi tiết nhé!`
+      : `Top programming courses:\n1. Java Basics for Beginners (499,000 VND)\n2. Practical Spring Boot (890,000 VND)\n3. SQL Data Queries (540,000 VND)\nWhat is your current level and goal?`
+  }
+  if (/tieng anh|ngoai ngu|ielts|giao tiep|toeic|english/.test(q)) {
+    return vi
+      ? `Chào bạn! Về mảng Ngoại ngữ & Kỹ năng giao tiếp, LearnHub xin gợi ý:\n\n1. IELTS Writing 6.5 (Giảng viên: Trần Khoa) - 790.000 đ [Trung cấp]\n→ Luyện dàn ý Task 1 & Task 2, bộ từ vựng học thuật theo chủ đề và chữa bài viết mẫu chi tiết.\n\n2. Thuyết trình tự tin (Giảng viên: Lê Hà) - 420.000 đ [Trung cấp]\n→ Luyện mở bài thu hút, giữ nhịp tương tác và tự tin nói trước lớp hay đám đông.\n\nBạn đang ôn luyện thi chứng chỉ hay muốn cải thiện giao tiếp công sở?`
+      : `Top language courses:\n1. IELTS Writing 6.5 (790,000 VND)\n2. Confident Presentations (420,000 VND)`
+  }
+  if (/thiet ke|design|ui|ux|figma|do hoa/.test(q)) {
+    return vi
+      ? `Chào bạn! Về lĩnh vực Thiết kế & UI/UX, sản phẩm nổi bật nhất gồm:\n\n1. Thiết kế giao diện căn bản (Giảng viên: Lê Hà) - 650.000 đ [Cơ bản]\n→ Nắm vững bố cục, màu sắc, typography và thực hành làm Landing Page hoàn chỉnh cho sản phẩm số.\n\n2. Marketing cho khóa học (Giảng viên: Trần Khoa) - 610.000 đ [Cơ bản]\n→ Viết nội dung và thiết kế ấn phẩm truyền thông quảng cáo.\n\nKhóa học có bài tập thực chiến và giảng viên phản hồi trực tiếp.`
+      : `Top design courses:\n1. UI/UX Interface Design Basics (650,000 VND)`
+  }
+  if (/tin hoc|excel|van phong|office/.test(q)) {
+    return vi
+      ? `Chào bạn! Về Tin học văn phòng & Dữ liệu thực chiến:\n\n1. Excel cho công việc (Giảng viên: Mai Lan) - 350.000 đ [Cơ bản]\n→ Hàm tính toán thông dụng, bảng PivotTable, vẽ biểu đồ và tự động hóa báo cáo doanh thu.\n\n2. SQL truy vấn dữ liệu (Giảng viên: Lê Hà) - 540.000 đ [Trung cấp]\n→ Phân tích dữ liệu học viên, đơn hàng và báo cáo thống kê.\n\nNhập mã LEARNHUB20 ở giỏ hàng để được giảm ngay 20% khi đăng ký bạn nhé!`
+      : `Top office courses:\n1. Excel for Work (350,000 VND)\n2. SQL Data Queries (540,000 VND)`
+  }
+
+  return vi
+    ? `Dạ chào bạn! LearnHub hiện có các nhóm sản phẩm khóa học chất lượng cao được đánh giá tốt nhất:\n\n📌 1. Lập trình & Công nghệ:\n- Java cơ bản cho người mới (499.000 đ, Mai Lan)\n- Spring Boot thực hành (890.000 đ, Trần Khoa)\n- SQL truy vấn dữ liệu (540.000 đ, Lê Hà)\n\n📌 2. Ngoại ngữ & Giao tiếp:\n- IELTS Writing 6.5 (790.000 đ, Trần Khoa)\n- Thuyết trình tự tin (420.000 đ, Lê Hà)\n\n📌 3. Thiết kế & Tin học văn phòng:\n- Thiết kế giao diện UI/UX căn bản (650.000 đ, Lê Hà)\n- Excel cho công việc (350.000 đ, Mai Lan)\n\n🎁 Ưu đãi độc quyền: Bạn có thể nhập mã LEARNHUB20 tại giỏ hàng để nhận ngay giảm giá 20%!\nBạn đang quan tâm đến lĩnh vực nào để mình tư vấn lộ trình học phù hợp nhất nhé?`
+    : `Welcome! LearnHub offers top courses in Programming (Java, Spring Boot), English (IELTS Writing), UI/UX Design, and Excel. Use promo code LEARNHUB20 for 20% off. Which subject are you interested in?`
+}
+
 export function isDataQuestion(question: string) {
   const q = fold(question)
-  return /doanh thu|coupon|voucher|ma giam|loi|thuc linh|phi san|don|ban duoc|khoa hoc|gio hang|chung chi|bao cao|excel|xlsx|tai khoan|cho duyet|kyc|ho so|suat|tien/.test(q)
+  return /doanh thu|coupon|voucher|ma giam|loi|thuc linh|phi san|don|ban duoc|gio hang|chung chi|bao cao|excel|xlsx|cho duyet|kyc|ho so|suat|tien/.test(q)
 }
 
 function looksLikeDirections(text: string) {
@@ -277,6 +444,29 @@ function looksLikeDirections(text: string) {
 }
 
 export function pickAnswer(aiText: string, question: string, briefing: string, role?: string, vi = true) {
+  // 1. Kiem tra MCP Guardrail cho nguoi dung khong phai Admin
+  if (role !== 'ADMIN' && isMcpRestricted(question)) {
+    return {
+      text: vi
+        ? 'Tôi không có đủ thẩm quyền để trả lời câu hỏi này theo quy định an toàn hệ thống (MCP Policy). Tôi chỉ có thể hỗ trợ tư vấn các sản phẩm khóa học và giải đáp thông tin học tập trên LearnHub.'
+        : 'I do not have authorization to answer this question per MCP security policies.',
+      exportKind: null,
+    }
+  }
+
+  // 2. Kiem tra lenh dieu huong Admin
+  if (role === 'ADMIN') {
+    const nav = detectAdminNav(question, role, vi)
+    if (nav) {
+      return { text: `${nav.text}\n[[NAV:${nav.path}]]`, exportKind: null }
+    }
+  }
+
+  // 3. Kiem tra cau hoi san pham
+  if (isProductQuestion(question)) {
+    return { text: consultProducts(question, vi), exportKind: null }
+  }
+
   const parsed = stripExport(aiText)
   if (!isDataQuestion(question)) return parsed
   const hasNumber = /\d/.test(parsed.text)
@@ -285,17 +475,38 @@ export function pickAnswer(aiText: string, question: string, briefing: string, r
 }
 
 export function localAnswer(question: string, briefing: string, role?: string, vi = true) {
-  const q = fold(question)
+  // 1. Kiem tra MCP Guardrail cho nguoi dung thong thuong
+  if (role !== 'ADMIN' && isMcpRestricted(question)) {
+    return vi
+      ? 'Tôi không có đủ thẩm quyền để trả lời câu hỏi này theo quy định an toàn hệ thống (MCP Policy). Tôi chỉ có thể hỗ trợ tư vấn các sản phẩm khóa học và giải đáp thông tin học tập trên LearnHub.'
+      : 'I do not have authorization to answer this question per MCP security policies.'
+  }
+
+  // 2. Kiem tra lenh dieu huong Admin
+  if (role === 'ADMIN') {
+    const nav = detectAdminNav(question, role, vi)
+    if (nav) {
+      return `${nav.text}\n[[NAV:${nav.path}]]`
+    }
+  }
+
+  // 3. Kiem tra tu van san pham
+  if (isProductQuestion(question)) {
+    return consultProducts(question, vi)
+  }
+
+  // 4. Tra cuu so lieu he thong
   const dataAsk = isDataQuestion(question)
   if (dataAsk && briefing) {
     return vi
       ? `Số liệu lấy lúc bạn hỏi:\n${briefing.replace(/Nếu người dùng[\s\S]*$/, '').replace(/Nếu bảo xuất[\s\S]*$/, '').trim()}`
       : `Live figures from this moment:\n${briefing}`
   }
+
   if (role === 'ADMIN') {
     return vi
-      ? 'Hãy hỏi doanh thu, coupon, đơn tháng này, khóa chờ duyệt, tài khoản đang khóa, hoặc bảo xuất Excel.'
-      : 'Ask for revenue, coupons, this month’s orders, pending courses, locked accounts, or an Excel export.'
+      ? 'Bạn đang dùng AI quản trị. Ra lệnh "mở [chức năng]" (tài khoản, duyệt khóa, doanh thu, kyc, coupon, báo cáo...) để AI tự động chuyển trang. Hoặc hỏi doanh thu, coupon, bảo xuất Excel.'
+      : 'Admin AI. Say "open [feature]" to auto-navigate, or ask for revenue, coupons, and Excel exports.'
   }
   if (role === 'INSTRUCTOR') {
     return vi
@@ -303,6 +514,7 @@ export function localAnswer(question: string, briefing: string, role?: string, v
       : 'Ask for payout, vouchers, KYC, buyers who messaged you, or an Excel export.'
   }
   return vi
-    ? 'Hãy hỏi giỏ hàng, đơn mua, khóa đang học, chứng chỉ, hoặc bảo xuất Excel danh sách đó.'
-    : 'Ask about your cart, orders, courses, certificates, or an Excel export.'
+    ? 'Chào bạn! Mình là AI trợ lý của LearnHub. Bạn có thể hỏi mình tư vấn các sản phẩm khóa học, lộ trình học tập, xem giỏ hàng hoặc chính sách hoàn tiền.'
+    : 'Welcome! I am LearnHub AI Assistant. Ask me about course products, learning paths, your cart, or refund policies.'
 }
+

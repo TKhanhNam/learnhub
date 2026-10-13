@@ -2194,6 +2194,25 @@ label { display: block; margin: 12px 0 6px; font-weight: 600; }
   align-self: flex-end;
   background: #dbeafe;
 }
+.ai-nav-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 6px 12px;
+  font-size: 13px;
+  font-weight: 600;
+  color: #fff;
+  background: #2563eb;
+  border: none;
+  border-radius: 8px;
+  cursor: pointer;
+  transition: background 0.15s ease, transform 0.1s ease;
+  box-shadow: 0 1px 3px rgba(37, 99, 235, 0.2);
+}
+.ai-nav-btn:hover {
+  background: #1d4ed8;
+  transform: translateY(-1px);
+}
 .ai-chat-panel form {
   display: flex;
   gap: 8px;

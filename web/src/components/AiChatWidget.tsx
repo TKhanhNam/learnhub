@@ -1,12 +1,23 @@
 import { FormEvent, useEffect, useRef, useState } from 'react'
+import { useNavigate } from 'react-router-dom'
 import { useAuth } from '../context/AuthContext'
 import { useI18n } from '../context/I18nContext'
 import axiosClient from '../api/axiosClient'
-import { exportFromQuestion, gatherBriefing, localAnswer, pickAnswer, runExport } from '../lib/aiCare'
+import {
+  detectAdminNav,
+  exportFromQuestion,
+  gatherBriefing,
+  labelForNav,
+  localAnswer,
+  pickAnswer,
+  runExport,
+  stripNav,
+} from '../lib/aiCare'
 
 interface Bubble {
   from: 'bot' | 'user'
   text: string
+  nav?: { path: string; label: string }
 }
 
 function roleName(role: string | undefined, vi: boolean) {
@@ -20,8 +31,8 @@ function roleName(role: string | undefined, vi: boolean) {
 function roleHint(role: string | undefined, vi: boolean) {
   if (role === 'ADMIN') {
     return vi
-      ? 'AI quản trị. Hỏi doanh thu, coupon, đơn tháng này, khóa chờ duyệt — sẽ trả số. Bảo xuất Excel thì file tải về máy.'
-      : 'Admin AI. Ask for revenue, coupons, this month’s orders, pending courses. Say export Excel to download a file.'
+      ? 'AI Quản trị. Ra lệnh "mở [chức năng]" (tài khoản, duyệt khóa, doanh thu, kyc, coupon, báo cáo...) để AI tự động chuyển trang. Hỏi doanh thu, bảo xuất Excel...'
+      : 'Admin AI. Say "open [feature]" to auto-navigate, or ask for revenue, coupons, and Excel exports.'
   }
   if (role === 'INSTRUCTOR') {
     return vi
@@ -35,12 +46,12 @@ function roleHint(role: string | undefined, vi: boolean) {
   }
   if (role === 'STUDENT') {
     return vi
-      ? 'AI người mua. Hỏi giỏ hàng, đơn mua, khóa đang học, chứng chỉ — sẽ trả số. Bảo xuất Excel thì file tải về.'
-      : 'Buyer AI. Ask about cart, orders, courses, certificates. Say export Excel to download a file.'
+      ? 'AI trợ lý LearnHub. Hỏi tư vấn các sản phẩm khóa học (Lập trình, Tiếng Anh, Thiết kế, Tin học), giỏ hàng, đơn mua, khóa đang học, chứng chỉ...'
+      : 'LearnHub AI Assistant. Ask for course recommendations (Programming, English, Design, Excel), cart, orders, certificates...'
   }
   return vi
-    ? 'AI người mua cho khách. Đăng nhập để xem số liệu đúng vai trò.'
-    : 'Buyer AI for guests. Sign in for live figures for your role.'
+    ? 'AI tư vấn LearnHub. Hãy hỏi về các sản phẩm khóa học, lộ trình học tập hoặc chính sách của sàn.'
+    : 'LearnHub AI Consultant. Ask about course products, learning tracks, or platform policies.'
 }
 
 function accountKey(id: number | undefined, role: string | undefined) {
@@ -60,6 +71,7 @@ function readLog(key: string): Bubble[] {
 export default function AiChatWidget() {
   const { user, isAuthenticated } = useAuth()
   const { locale } = useI18n()
+  const navigate = useNavigate()
   const vi = locale === 'vi'
   const [open, setOpen] = useState(false)
   const [text, setText] = useState('')
@@ -110,7 +122,25 @@ export default function AiChatWidget() {
         textOut = `${textOut}\n${vi ? 'Không xuất được file. Hãy chạy commerce/catalog/identity rồi hỏi lại.' : 'Could not export. Start commerce/catalog/identity and ask again.'}`
       }
     }
-    setMessages((prev) => [...prev, { from: 'bot', text: textOut }])
+
+    // Xu ly tu dong mo chuc nang cho Admin
+    const navCheck = stripNav(textOut)
+    textOut = navCheck.text
+    let navTarget = navCheck.navPath ? { path: navCheck.navPath, label: labelForNav(navCheck.navPath, vi) } : null
+
+    if (user?.role === 'ADMIN' && !navTarget) {
+      const direct = detectAdminNav(question, user?.role, vi)
+      if (direct) {
+        navTarget = { path: direct.path, label: direct.label }
+      }
+    }
+
+    // TU DONG CHUYEN TRANG NGAY LAP TUC CHO ADMIN
+    if (user?.role === 'ADMIN' && navTarget) {
+      navigate(navTarget.path)
+    }
+
+    setMessages((prev) => [...prev, { from: 'bot', text: textOut, nav: navTarget || undefined }])
     setBusy(false)
   }
 
@@ -125,14 +155,31 @@ export default function AiChatWidget() {
           <div className="ai-chat-log" ref={logRef}>
             <p className="bot">{greeting}</p>
             {messages.map((item, index) => (
-              <p key={index} className={item.from === 'user' ? 'mine' : 'bot'}>{item.text}</p>
+              <p key={index} className={item.from === 'user' ? 'mine' : 'bot'}>
+                {item.text}
+                {item.nav && (
+                  <span style={{ display: 'block', marginTop: 8 }}>
+                    <button
+                      type="button"
+                      className="ai-nav-btn"
+                      onClick={() => navigate(item.nav!.path)}
+                    >
+                      🚀 {vi ? `Mở ${item.nav.label}` : `Open ${item.nav.label}`}
+                    </button>
+                  </span>
+                )}
+              </p>
             ))}
           </div>
           <form onSubmit={ask}>
             <input
               value={text}
               onChange={(e) => setText(e.target.value)}
-              placeholder={vi ? 'Hỏi doanh thu, coupon, xuất Excel...' : 'Ask for revenue, coupons, Excel...'}
+              placeholder={
+                user?.role === 'ADMIN'
+                  ? (vi ? 'Ra lệnh: mở tài khoản, mở duyệt khóa, mở doanh thu...' : 'Command: open users, courses, revenue...')
+                  : (vi ? 'Hỏi tư vấn sản phẩm khóa học, lộ trình học...' : 'Ask for courses, products, paths...')
+              }
             />
             <button type="submit" disabled={busy}>{busy ? '...' : (vi ? 'Gửi' : 'Send')}</button>
           </form>
