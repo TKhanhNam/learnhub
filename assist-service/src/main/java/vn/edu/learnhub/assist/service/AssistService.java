@@ -150,9 +150,6 @@ public class AssistService {
         if ((q.contains("coupon") || q.contains("voucher") || q.contains("ma giam")) && isCmd) {
             return "Đã tự động mở chức năng Coupon sàn (/admin/coupons) cho bạn.\n[[NAV:/admin/coupons]]";
         }
-        if (q.contains("business") || q.contains("doanh nghiep") || q.contains("to chuc") || q.contains("b2b")) {
-            return "Đã tự động mở chức năng Gói Business (/admin/business) cho bạn.\n[[NAV:/admin/business]]";
-        }
         if ((q.contains("bao cao") || q.contains("reports")) && isCmd) {
             return "Đã tự động mở chức năng Báo cáo Excel (/admin/reports) cho bạn.\n[[NAV:/admin/reports]]";
         }
@@ -288,7 +285,6 @@ public class AssistService {
                       + Doanh thu sàn: [[NAV:/admin/revenue]]
                       + Phân tích: [[NAV:/admin/analytics]]
                       + Coupon sàn: [[NAV:/admin/coupons]]
-                      + Gói Business: [[NAV:/admin/business]]
                       + Báo cáo Excel: [[NAV:/admin/reports]]
                       + Bàn vận hành & KYC: [[NAV:/admin/desk]]
                       + Tổng quan: [[NAV:/admin]]
@@ -412,12 +408,10 @@ class HelpSeeder implements ApplicationRunner {
         seed("coupon", "Mã giảm giá", "Nhập LEARNHUB20 ở giỏ hàng để giảm 20% (mã demo của sàn).", "vi", "all");
         seed("gift", "Mua tặng", "Ở trang thanh toán chọn Mua tặng và nhập email người nhận đã có tài khoản.", "vi", "all");
         seed("certificate", "Chứng chỉ", "Hoàn thành khóa học rồi bấm Xuất chứng chỉ trong mục Chứng chỉ.", "vi", "all");
-        seed("business", "Gói doanh nghiệp", "Đăng ký dùng thử ở trang Doanh nghiệp. Quản trị doanh nghiệp cấp khóa cho nhân sự.", "vi", "all");
         seed("refund", "Refunds", "LearnHub refunds within 7 days if you completed under 30% of lectures.", "en", "all");
         seed("coupon", "Coupons", "Enter LEARNHUB20 at checkout for 20% off (platform demo code).", "en", "all");
         seed("gift", "Gifting", "At checkout, choose Buy as a gift and enter the recipient email.", "en", "all");
         seed("certificate", "Certificates", "Finish a course, then issue a certificate from Certificates.", "en", "all");
-        seed("business", "Business plans", "Request a demo on the Business page. An organization admin assigns courses to staff.", "en", "all");
 
         seed("buyer-search", "Tìm khóa và giảng viên", "Ô tìm nhận cả tên khóa lẫn tên giảng viên. Khớp giảng viên thì trang hiện tên, giới thiệu và toàn bộ khóa của người đó.", "vi", "buyer");
         seed("buyer-message", "Nhắn giảng viên", "Trên trang giảng viên hoặc trang khóa, bấm Nhắn giảng viên. Cần đăng nhập. Khung tin nhắn mở ở góc trái.", "vi", "buyer");
@@ -449,8 +443,7 @@ class HelpSeeder implements ApplicationRunner {
         seed("admin-report", "Báo cáo Excel", "Trong AI Care, quản trị viên có thể yêu cầu AI xuất file Excel báo cáo quản trị toàn sàn (doanh thu sàn, tài khoản người dùng, danh mục khóa học).", "vi", "admin");
         seed("admin-live", "Hỏi số liệu", "Hỏi doanh thu tháng này, có bao nhiêu coupon, khóa chờ duyệt, tài khoản đang khóa. Trợ lý lấy số lúc hỏi, không chỉ đường bấm menu.", "vi", "admin");
         seed("admin-security", "Khóa đăng nhập", "Sai mật khẩu 5 lần trong 10 phút thì địa chỉ IP bị khóa đăng nhập 15 phút.", "vi", "admin");
-        seed("admin-business", "Gói Business", "Mục Gói Business xem doanh nghiệp đăng ký và việc cấp khóa cho nhân sự.", "vi", "admin");
-        seed("admin-cmd-nav", "Lệnh mở chức năng quản trị", "Khi admin ra lệnh: 'mở tài khoản' -> /admin/users; 'mở duyệt khóa' -> /admin/courses; 'mở doanh thu' -> /admin/revenue; 'mở phân tích' -> /admin/analytics; 'mở coupon' -> /admin/coupons; 'mở business' -> /admin/business; 'mở báo cáo' -> /admin/reports; 'mở vận hành' / 'mở kyc' -> /admin/desk; 'mở tổng quan' -> /admin. Hệ thống tự động chuyển trang.", "vi", "admin");
+        seed("admin-cmd-nav", "Lệnh mở chức năng quản trị", "Khi admin ra lệnh: 'mở tài khoản' -> /admin/users; 'mở duyệt khóa' -> /admin/courses; 'mở doanh thu' -> /admin/revenue; 'mở phân tích' -> /admin/analytics; 'mở coupon' -> /admin/coupons; 'mở báo cáo' -> /admin/reports; 'mở vận hành' / 'mở kyc' -> /admin/desk; 'mở tổng quan' -> /admin. Hệ thống tự động chuyển trang.", "vi", "admin");
 
         seed("mcp-policy-system", "Chính sách an toàn MCP - Hệ thống", "Theo quy định an toàn hệ thống (MCP Policy), AI không được phép tiết lộ thông tin kỹ thuật máy chủ, kiến trúc backend, cổng kết nối hay mã nguồn cho người dùng không có thẩm quyền.", "vi", "buyer");
         seed("mcp-policy-db", "Chính sách an toàn MCP - Cơ sở dữ liệu", "Theo quy định an toàn hệ thống (MCP Policy), thông tin về cơ sở dữ liệu, bảng dữ liệu, kết nối DB và cấu trúc lưu trữ nội bộ là tuyệt mật và không được cung cấp.", "vi", "buyer");
@@ -485,7 +478,6 @@ class HelpSeeder implements ApplicationRunner {
         seed("admin-desk", "Operations desk", "Desk handles orders, payout verification, and cash movement.", "en", "admin");
         seed("admin-report", "Excel reports", "Excel reports exports users and operating figures.", "en", "admin");
         seed("admin-security", "Login lock", "Five wrong passwords within 10 minutes lock that IP from signing in for 15 minutes.", "en", "admin");
-        seed("admin-business", "Business plans", "Business shows organizations that signed up and how they assign courses to staff.", "en", "admin");
     }
 
     private void seed(String slug, String title, String body, String locale, String audience) {

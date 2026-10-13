@@ -110,7 +110,6 @@ export default function Navbar() {
             <NavLink to="/favorites">{vi ? 'Yêu thích' : 'Saved'}</NavLink>
             <NavLink to="/orders">{vi ? 'Đơn mua' : 'Orders'}</NavLink>
             <NavLink to="/sell">{vi ? 'Kênh bán' : 'Sell'}</NavLink>
-            <NavLink to="/business">{t('business')}</NavLink>
             <NavLink to="/help">{t('help')}</NavLink>
             {user?.role === 'INSTRUCTOR' && <NavLink to="/studio">{t('studio')}</NavLink>}
             {user?.role === 'ORG_ADMIN' && <NavLink to="/org">L&D</NavLink>}

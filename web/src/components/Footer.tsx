@@ -10,7 +10,6 @@ export default function Footer() {
         <p>© LearnHub</p>
         <nav>
           <Link to="/courses">{t('courses')}</Link>
-          <Link to="/business">{t('business')}</Link>
           <Link to="/help">{t('help')}</Link>
           <Link to="/terms">{vi ? 'Điều khoản' : 'Terms'}</Link>
         </nav>

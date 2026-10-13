@@ -41,5 +41,4 @@ export const GUIDED_LINKS = [
   { to: '/courses?category=ai', vi: 'Khóa học AI', en: 'AI courses' },
   { to: '/courses?category=tin-hoc', vi: 'Tin học văn phòng', en: 'IT essentials' },
   { to: '/courses?category=toan', vi: 'Toán học', en: 'Math tracks' },
-  { to: '/business', vi: 'Dành cho doanh nghiệp', en: 'For business' },
 ]

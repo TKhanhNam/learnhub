@@ -490,7 +490,6 @@ export function labelForNav(path: string, vi = true): string {
     case '/admin/revenue': return vi ? 'Doanh thu sàn' : 'Platform Revenue'
     case '/admin/analytics': return vi ? 'Phân tích' : 'Analytics'
     case '/admin/coupons': return vi ? 'Coupon sàn' : 'Platform Coupons'
-    case '/admin/business': return vi ? 'Gói Business' : 'Business Plans'
     case '/admin/reports': return vi ? 'Báo cáo Excel' : 'Excel Reports'
     case '/admin/desk': return vi ? 'Bàn vận hành & KYC' : 'Operations Desk & KYC'
     case '/': return vi ? 'Trang chủ học viên' : 'Learner Home'
@@ -546,15 +545,6 @@ export function detectAdminNav(question: string, role?: string, vi = true): { pa
       text: vi
         ? 'Đã tự động mở chức năng Coupon sàn (/admin/coupons) cho bạn.'
         : 'Navigating to Platform Coupons (/admin/coupons)...',
-    }
-  }
-  if (/business|doanh nghiep|to chuc|b2b/.test(q)) {
-    return {
-      path: '/admin/business',
-      label: vi ? 'Gói Business' : 'Business Plans',
-      text: vi
-        ? 'Đã tự động mở chức năng Gói Business (/admin/business) cho bạn.'
-        : 'Navigating to Business Plans (/admin/business)...',
     }
   }
   if ((/bao cao|reports/.test(q) && isCommand) || /trang bao cao|trang reports/.test(q)) {

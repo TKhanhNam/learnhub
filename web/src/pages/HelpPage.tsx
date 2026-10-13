@@ -23,7 +23,6 @@ const RELATED: Record<string, { to: string; vi: string; en: string }> = {
   coupon: { to: '/cart', vi: 'Đến giỏ hàng', en: 'Go to cart' },
   gift: { to: '/cart', vi: 'Đến giỏ hàng', en: 'Go to cart' },
   certificate: { to: '/certificates', vi: 'Đến chứng chỉ', en: 'Go to certificates' },
-  business: { to: '/business', vi: 'Đến trang doanh nghiệp', en: 'Go to business' },
 }
 
 export default function HelpPage() {

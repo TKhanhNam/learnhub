@@ -13,7 +13,6 @@ import LearningPage from './pages/LearningPage'
 import PlayerPage from './pages/PlayerPage'
 import StudioPage from './pages/StudioPage'
 import HelpPage from './pages/HelpPage'
-import BusinessPage from './pages/BusinessPage'
 import OrgPage from './pages/OrgPage'
 import AdminLayout from './admin/AdminLayout'
 import AdminDashboardPage from './admin/AdminDashboardPage'
@@ -34,7 +33,6 @@ import ForgotPasswordPage from './pages/ForgotPasswordPage'
 import ResetPasswordPage from './pages/ResetPasswordPage'
 import VerifyEmailPage from './pages/VerifyEmailPage'
 import AdminCouponsPage from './admin/AdminCouponsPage'
-import AdminBusinessPage from './admin/AdminBusinessPage'
 import { useI18n } from './context/I18nContext'
 import { useAuth } from './context/AuthContext'
 import AiChatWidget from './components/AiChatWidget'
@@ -78,7 +76,7 @@ export default function App() {
           <Route path="/forgot-password" element={<ForgotPasswordPage />} />
           <Route path="/reset-password" element={<ResetPasswordPage />} />
           <Route path="/verify-email" element={<VerifyEmailPage />} />
-          <Route path="/business" element={<BusinessPage />} />
+          <Route path="/business" element={<Navigate to="/courses" replace />} />
           <Route path="/cart" element={<ProtectedRoute requireVerified><CartPage /></ProtectedRoute>} />
           <Route path="/learning" element={<ProtectedRoute><LearningPage /></ProtectedRoute>} />
           <Route path="/certificates" element={<ProtectedRoute><CertificatesPage /></ProtectedRoute>} />
@@ -93,7 +91,7 @@ export default function App() {
             <Route path="revenue" element={<AdminRevenuePage />} />
             <Route path="analytics" element={<AdminAnalyticsPage />} />
             <Route path="coupons" element={<AdminCouponsPage />} />
-            <Route path="business" element={<AdminBusinessPage />} />
+            <Route path="business" element={<Navigate to="/admin" replace />} />
             <Route path="reports" element={<AdminReportsPage />} />
             <Route path="desk" element={<AdminDeskPage />} />
           </Route>
