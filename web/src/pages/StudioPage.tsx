@@ -150,7 +150,7 @@ export default function StudioPage() {
             }}>+ slide/text</button>
           </div>
           <div style={{ marginTop: '0.75rem', padding: '0.75rem', borderRadius: '8px', border: '1px solid rgba(255,255,255,0.1)', background: 'rgba(255,255,255,0.03)' }}>
-            <p style={{ fontSize: '0.85rem', marginBottom: '0.5rem', color: '#38bdf8' }}><strong>Upload MinIO Object Storage (Video / Slide PDF) — Lâm Thu Thùy</strong></p>
+            <p style={{ fontSize: '0.85rem', marginBottom: '0.5rem', color: '#38bdf8' }}><strong>Upload MinIO Object Storage (Video / Slide PDF)</strong></p>
             <div className="row" style={{ alignItems: 'center', gap: '0.5rem' }}>
               <input type="file" accept="video/*,.pdf" onChange={async (e) => {
                 const file = e.target.files?.[0]
