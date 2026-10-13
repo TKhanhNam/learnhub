@@ -29,8 +29,8 @@ export DB_SSL="${DB_SSL:-true}"
 export JWT_SECRET="${JWT_SECRET:-LearnHub-Shared-Secret-Key-2026-Doi-Trong-Moi-Truong-That}"
 export INTERNAL_KEY="${INTERNAL_KEY:-learnhub-internal-key-2026}"
 
-# Ultra-light JVM flags: Toi uu triet de RAM de chay muot ma tren goi Render Free (512MB RAM)
-JAVA_OPTS="-Xms16m -Xmx36m -Xss256k -XX:CICompilerCount=1 -XX:ReservedCodeCacheSize=16m -XX:+UseSerialGC -XX:TieredStopAtLevel=1 -Djava.security.egd=file:/dev/./urandom"
+# JVM flags hop ly cho Spring Boot chay tren container 512MB RAM
+JAVA_OPTS="-Xms24m -Xmx80m -XX:+UseSerialGC -Djava.security.egd=file:/dev/./urandom"
 
 server_pids=()
 
@@ -48,29 +48,27 @@ start_service() {
     local jar="/app/${name}.jar"
     if [[ -f "$jar" ]]; then
         echo "=> Starting ${name}..."
-        java $JAVA_OPTS -jar "$jar" > "/var/log/${name}.log" 2>&1 &
+        # In truc tiep log ra man hinh de Render Dashboard nhin thay ro rang
+        java $JAVA_OPTS -jar "$jar" 2>&1 | sed -u "s/^/[${name}] /" &
         local pid="$!"
         server_pids+=("$pid")
         sleep 2
-        if ! kill -0 "$pid" 2>/dev/null; then
-            echo "!! ERROR: ${name} failed to start. Last log entries:"
-            tail -n 25 "/var/log/${name}.log" || true
-        fi
+    else
+        echo "!! WARNING: Jar not found: $jar"
     fi
 }
 
-mkdir -p /var/log
-
-# Khoi dong cac service loi phuc vu dang nhap, admin, khoa hoc va mua ban (vua van ~250MB RAM)
-echo "=> Launching core services for LearnHub (Web, Auth, Catalog, Commerce)..."
+# 4. Khoi dong cac service cot loi cho web, dang nhap, admin va khoa hoc
+echo "=> Launching core services for LearnHub (Identity, Catalog, Commerce, Gateway)..."
 start_service "identity-service"
 start_service "catalog-service"
 start_service "commerce-service"
-start_service "learning-service"
+start_service "api-gateway"
 
-# Khoi dong cac service bo sung neu bat START_ALL_SERVICES=true tren Render
+# Neu nguoi dung cau hinh START_ALL_SERVICES=true thi chay them cac service con lai
 if [[ "${START_ALL_SERVICES:-false}" == "true" ]]; then
     echo "=> START_ALL_SERVICES is true, launching additional services..."
+    start_service "learning-service"
     start_service "content-service"
     start_service "social-service"
     start_service "org-service"
@@ -78,14 +76,20 @@ if [[ "${START_ALL_SERVICES:-false}" == "true" ]]; then
     start_service "payment-service"
 fi
 
-# Khoi dong API Gateway (port 8080)
-start_service "api-gateway"
+# 5. Cho den khi API Gateway hoac Identity Service thuc su khoi dong xong va mo port
+echo "=> Waiting for API Gateway (8080) and Identity Service (8081) to become ready..."
+for i in {1..35}; do
+    if curl -s "http://127.0.0.1:8080/api/auth/login" >/dev/null 2>&1 || curl -s "http://127.0.0.1:8081/auth/login" >/dev/null 2>&1; then
+        echo "=> Core backend services are UP and responding!"
+        break
+    fi
+    echo "=> Still waiting for backend services ($i/35)..."
+    sleep 2
+done
 
-echo "=> Waiting for API Gateway and Identity Service to bind ports..."
-sleep 5
-
+# 6. Kiem tra va khoi dong Nginx
 echo "=> Testing Nginx configuration..."
 nginx -t
 
-echo "=> LearnHub is live! Starting Nginx reverse proxy..."
+echo "=> LearnHub is live! Starting Nginx reverse proxy on port ${PORT}..."
 nginx -g "daemon off;"
