@@ -68,6 +68,9 @@ public interface CourseRepository extends JpaRepository<Course, Long> {
     @Query("select count(c) from Course c where c.status = :status")
     long countByStatusValue(@Param("status") String status);
 
+    @Query("select c from Course c order by c.id desc")
+    Page<Course> findAllOrderById(Pageable pageable);
+
     @Query("select coalesce(sum(c.enrollmentCount), 0) from Course c")
     long sumEnrollments();
 

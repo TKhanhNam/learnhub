@@ -47,7 +47,7 @@ export default function CartPage() {
   const [msg, setMsg] = useState<string | null>(null)
   const [busy, setBusy] = useState(false)
   const [paid, setPaid] = useState<PaidOrder | null>(null)
-  const [method, setMethod] = useState<'cod' | 'momo'>('cod')
+  const [method, setMethod] = useState<'momo'>('momo')
 
   const load = () => {
     axiosClient.get('/api/commerce/cart').then((res) => {
@@ -307,22 +307,6 @@ export default function CartPage() {
                     {couponState.status === 'idle' && (vi ? 'Thêm khóa học để áp mã.' : 'Add a course to apply the code.')}
                   </p>
                 )}
-                <p className="muted">
-                  {vi
-                    ? 'Thanh toán thường ghi đơn và mở khóa học ngay. MoMo mở form thẻ quốc tế: số 4111 1111 1111 1111, hạn 05/26, CVC 111, tên NGUYEN VAN A.'
-                    : 'Standard checkout opens the course now. MoMo sends you to the test gateway.'}
-                </p>
-                <fieldset className="pay-choice">
-                  <legend>{vi ? 'Cách thanh toán' : 'Payment'}</legend>
-                  <label>
-                    <input type="radio" name="pay" checked={method === 'cod'} onChange={() => setMethod('cod')} />
-                    <span>{vi ? 'Thanh toán thường' : 'Standard checkout'}</span>
-                  </label>
-                  <label>
-                    <input type="radio" name="pay" checked={method === 'momo'} onChange={() => setMethod('momo')} />
-                    <span>MoMo</span>
-                  </label>
-                </fieldset>
 
                 <label className="cart-check">
                   <input type="checkbox" checked={gift} onChange={(e) => setGift(e.target.checked)} />
@@ -349,9 +333,7 @@ export default function CartPage() {
                 <button className="cart-pay" onClick={checkout} disabled={items.length === 0 || busy}>
                   {busy
                     ? (vi ? 'Đang xử lý…' : 'Processing…')
-                    : method === 'momo'
-                      ? (vi ? `Thanh toán MoMo · ${vnd(total)}` : `Pay with MoMo · ${vnd(total)}`)
-                      : (vi ? `Thanh toán thường · ${vnd(total)}` : `Checkout · ${vnd(total)}`)}
+                    : (vi ? `Thanh toán MoMo · ${vnd(total)}` : `Pay with MoMo · ${vnd(total)}`)}
                 </button>
                 {msg && <p className="err">{msg}</p>}
               </>

@@ -176,9 +176,9 @@ public class CommerceService {
 
         long amount = total.setScale(0, RoundingMode.HALF_UP).longValue();
         String method = request == null || request.paymentMethod() == null
-                ? "cod" : request.paymentMethod().trim().toLowerCase();
+                ? "momo" : request.paymentMethod().trim().toLowerCase();
         if (!"cod".equals(method) && !"momo".equals(method)) {
-            throw BusinessException.badRequest("Chon thanh toan thuong hoac MoMo");
+            throw BusinessException.badRequest("Chon thanh toan MoMo");
         }
         if (amount <= 0 || "cod".equals(method)) {
             fulfill(order, source);

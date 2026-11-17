@@ -1,15 +1,12 @@
 import { FormEvent, useEffect, useState } from 'react'
 import { Link } from 'react-router-dom'
 import axiosClient from '../api/axiosClient'
-import QaPanel from '../components/QaPanel'
+import { getRejection } from '../lib/rejections'
 
 interface Course { id: number; title: string; status: string; price: number }
 interface Coupon { id: number; code: string; discountPercent: number; maxUses: number; usedCount: number; active: boolean }
-interface Review { id: number; authorName: string; rating: number; comment: string; instructorReply?: string }
-interface Submission { id: number; assignmentId: number; studentId: number; linkUrl: string; status: string; score?: number; feedback?: string }
-interface Stats { totalEnrollments: number; completedEnrollments: number; averageProgress: number }
 
-type Tab = 'courses' | 'content' | 'coupons' | 'analytics' | 'qa' | 'reviews' | 'grade'
+type Tab = 'courses' | 'content' | 'coupons'
 
 export default function StudioPage() {
   const [tab, setTab] = useState<Tab>('courses')
@@ -19,7 +16,6 @@ export default function StudioPage() {
   const [msg, setMsg] = useState<string | null>(null)
   const [categories, setCategories] = useState<{ id: number; name: string }[]>([])
   const [categoryId, setCategoryId] = useState<number>(1)
-  const [payout, setPayout] = useState('')
   const [selected, setSelected] = useState<number | null>(null)
   const [lectureTitle, setLectureTitle] = useState('Bài giảng video')
   const [quizTitle, setQuizTitle] = useState('Quiz kiểm tra')
@@ -27,10 +23,6 @@ export default function StudioPage() {
   const [coupons, setCoupons] = useState<Coupon[]>([])
   const [couponCode, setCouponCode] = useState('GV10')
   const [couponPct, setCouponPct] = useState('10')
-  const [reviews, setReviews] = useState<Review[]>([])
-  const [reply, setReply] = useState('')
-  const [subs, setSubs] = useState<Submission[]>([])
-  const [stats, setStats] = useState<Stats | null>(null)
   const [lectures, setLectures] = useState<Array<{ id: number; title: string; type: string; durationSeconds: number }>>([])
 
   const loadLectures = (courseId: number) => {
@@ -44,10 +36,6 @@ export default function StudioPage() {
       const list = res.data.data || []
       setCourses(list)
       if (!selected && list[0]) setSelected(list[0].id)
-    }).catch(() => {})
-    axiosClient.get('/api/commerce/instructor/payouts').then((res) => {
-      const d = res.data.data
-      setPayout(`Doanh thu ${Number(d.gross).toLocaleString('vi-VN')} ₫ · phí sàn 30% ${Number(d.platformFee).toLocaleString('vi-VN')} ₫ · thực lĩnh 70% ${Number(d.net).toLocaleString('vi-VN')} ₫`)
     }).catch(() => {})
     axiosClient.get('/api/catalog/coupons').then((res) => setCoupons(res.data.data || [])).catch(() => {})
   }
@@ -63,36 +51,33 @@ export default function StudioPage() {
   useEffect(() => {
     if (!selected) return
     loadLectures(selected)
-    axiosClient.get(`/api/social/reviews?courseId=${selected}`).then((r) => setReviews(r.data.data || [])).catch(() => {})
-    axiosClient.get(`/api/learning/instructor/submissions?courseId=${selected}`).then((r) => setSubs(r.data.data || [])).catch(() => setSubs([]))
-    axiosClient.get(`/api/learning/instructor/stats?courseIds=${selected}`).then((r) => setStats(r.data.data)).catch(() => {})
   }, [selected])
 
   const tabs: { id: Tab; label: string }[] = [
     { id: 'courses', label: 'Khóa & giá' },
     { id: 'content', label: 'Bài giảng / quiz' },
     { id: 'coupons', label: 'Coupon cá nhân' },
-    { id: 'analytics', label: 'Dashboard' },
-    { id: 'qa', label: 'Q&A' },
-    { id: 'reviews', label: 'Review' },
-    { id: 'grade', label: 'Chấm bài' },
   ]
 
   const createCourse = async (e: FormEvent) => {
     e.preventDefault()
-    const res = await axiosClient.post('/api/catalog/courses', {
-      title, subtitle: 'Landing khóa học', description: 'Trang giới thiệu, giá và nội dung demo.', categoryId,
-      price: Number(price), level: 'BEGINNER', language: 'vi', skills: ['Demo'],
-    })
-    setMsg('Đã tạo khóa #' + res.data.data.id)
-    load()
+    try {
+      const res = await axiosClient.post('/api/catalog/courses', {
+        title, subtitle: 'Landing khóa học', description: 'Trang giới thiệu, giá và nội dung demo.', categoryId,
+        price: Number(price), level: 'BEGINNER', language: 'vi', skills: ['Demo'],
+      })
+      setMsg('✅ Đã tạo khóa #' + res.data.data.id)
+      load()
+    } catch (err: any) {
+      const detail = err?.response?.data?.message || err?.response?.data?.error || err?.message || 'Không xác định'
+      setMsg('❌ Lỗi tạo khóa: ' + detail)
+    }
   }
 
   return (
     <div className="page">
       <h1>Studio giảng viên</h1>
-      <p><Link to="/sell">Kênh bán trên chợ: xác minh, gói quảng cáo, voucher shop, thu chi</Link></p>
-      <p className="muted">{payout || 'Chưa có doanh thu — sàn giữ 30%, giảng viên nhận 70%.'}</p>
+      <p><Link to="/sell">Kênh bán trên chợ: xác minh, voucher shop, thu chi</Link></p>
       <div className="tabs">
         {tabs.map((t) => (
           <button key={t.id} className={tab === t.id ? '' : 'ghost'} onClick={() => setTab(t.id)}>{t.label}</button>
@@ -110,25 +95,44 @@ export default function StudioPage() {
             </select>
             <button type="submit">Tạo khóa nháp</button>
           </form>
-          {courses.map((c) => (
-            <div key={c.id} className="card" style={{ marginTop: 8 }}>
-              <div className="body row">
-                <span className="grow">{c.title} · {c.status} · {Number(c.price).toLocaleString('vi-VN')} ₫</span>
-                <button className="ghost" onClick={() => setSelected(c.id)}>Chọn</button>
-                {(c.status === 'DRAFT' || c.status === 'REJECTED') && (
-                  <button className="ghost" onClick={async () => { await axiosClient.patch(`/api/catalog/courses/${c.id}/submit`); load() }}>Gửi duyệt</button>
-                )}
-                {c.status === 'PENDING' && <span className="muted">Đang chờ duyệt</span>}
-                {c.status === 'PUBLISHED' && <span className="muted">Đã xuất bản</span>}
+          {msg && (
+            <p style={{ marginTop: 8, color: msg.startsWith('❌') ? 'var(--danger, #c0392b)' : 'var(--success, #27ae60)' }}>
+              {msg} <button className="ghost" style={{ fontSize: 12 }} onClick={() => setMsg(null)}>✕</button>
+            </p>
+          )}
+          {courses.map((c) => {
+            const rej = c.status === 'REJECTED' ? getRejection(c.id) : null
+            return (
+              <div key={c.id} className="card" style={{ marginTop: 8 }}>
+                <div className="body">
+                  <div className="row" style={{ alignItems: 'center' }}>
+                    <span className="grow">
+                      <strong>{c.title}</strong> · {c.status === 'REJECTED' ? <span style={{ color: '#ef4444', fontWeight: 600 }}>Bị từ chối</span> : c.status} · {Number(c.price).toLocaleString('vi-VN')} ₫
+                    </span>
+                    <button className="ghost" onClick={() => setSelected(c.id)}>Chọn</button>
+                    {c.status === 'DRAFT' && (
+                      <button className="ghost" onClick={async () => { await axiosClient.patch(`/api/catalog/courses/${c.id}/submit`); load() }}>Gửi duyệt</button>
+                    )}
+                    {c.status === 'REJECTED' && (
+                      <button className="ghost" style={{ color: '#0284c7' }} onClick={async () => { await axiosClient.patch(`/api/catalog/courses/${c.id}/submit`); load() }}>Gửi duyệt lại</button>
+                    )}
+                    {c.status === 'PENDING' && <span className="muted">Đang chờ duyệt</span>}
+                    {c.status === 'PUBLISHED' && <span className="muted" style={{ color: '#16a34a', fontWeight: 500 }}>Đã xuất bản</span>}
+                  </div>
+                  {rej && (
+                    <div style={{ marginTop: 8, padding: '6px 12px', background: 'rgba(239, 68, 68, 0.08)', borderRadius: 6, border: '1px solid rgba(239, 68, 68, 0.25)', fontSize: '0.85rem', color: '#b91c1c' }}>
+                      <strong>Lý do từ chối:</strong> {rej.reason}
+                    </div>
+                  )}
+                </div>
               </div>
-            </div>
-          ))}
+            )
+          })}
         </>
       )}
 
       {tab === 'content' && selected && (
         <>
-          {/* Phân hệ Quản lý Nội dung: Lâm Thu Thùy (thuy1411) */}
           <p className="muted">Khóa đang soạn: #{selected}</p>
           <h3>Bài giảng (video / văn bản / slide) — Studio nội dung</h3>
           <div className="row">
@@ -254,62 +258,6 @@ export default function StudioPage() {
               </div>
             </div>
           ))}
-        </>
-      )}
-
-      {tab === 'analytics' && (
-        <>
-          <h3>Dashboard: doanh thu / enroll / hoàn thành / rating</h3>
-          <p>{payout}</p>
-          {stats && (
-            <p>Đăng ký {stats.totalEnrollments} · hoàn thành {stats.completedEnrollments} · tiến độ TB {(stats.averageProgress || 0).toFixed(1)}%</p>
-          )}
-          {selected && reviews.length > 0 && <p>Review khóa #{selected}: {reviews.length} lượt</p>}
-        </>
-      )}
-
-      {tab === 'qa' && selected && <QaPanel courseId={selected} canPost={false} canAnswer vi />}
-
-      {tab === 'reviews' && selected && (
-        <>
-          <h3>Phản hồi review</h3>
-          {reviews.map((r) => (
-            <div key={r.id} className="card" style={{ marginBottom: 8 }}>
-              <div className="body">
-                <strong>{r.authorName}</strong> · {r.rating}/5
-                <p>{r.comment}</p>
-                {r.instructorReply && <p className="muted">Đã trả lời: {r.instructorReply}</p>}
-                <div className="row">
-                  <input className="grow" value={reply} onChange={(e) => setReply(e.target.value)} placeholder="Phản hồi..." />
-                  <button className="ghost" onClick={async () => {
-                    await axiosClient.post(`/api/social/reviews/${r.id}/reply`, { body: reply })
-                    setReply('')
-                    const x = await axiosClient.get(`/api/social/reviews?courseId=${selected}`)
-                    setReviews(x.data.data || [])
-                  }}>Gửi</button>
-                </div>
-              </div>
-            </div>
-          ))}
-        </>
-      )}
-
-      {tab === 'grade' && selected && (
-        <>
-          <h3>Chấm bài tập (link)</h3>
-          {subs.map((s) => (
-            <div key={s.id} className="card" style={{ marginBottom: 8 }}>
-              <div className="body">
-                <p>HV #{s.studentId} · <a href={s.linkUrl} target="_blank" rel="noreferrer">{s.linkUrl}</a> · {s.status}</p>
-                <button className="ghost" onClick={async () => {
-                  await axiosClient.post(`/api/learning/instructor/submissions/${s.id}/grade`, { score: 90, feedback: 'Tốt' })
-                  const x = await axiosClient.get(`/api/learning/instructor/submissions?courseId=${selected}`)
-                  setSubs(x.data.data || [])
-                }}>Chấm 90</button>
-              </div>
-            </div>
-          ))}
-          {subs.length === 0 && <p className="muted">Chưa có bài nộp.</p>}
         </>
       )}
       {msg && <p>{msg}</p>}

@@ -416,7 +416,7 @@ class HelpSeeder implements ApplicationRunner {
         seed("buyer-search", "Tìm khóa và giảng viên", "Ô tìm nhận cả tên khóa lẫn tên giảng viên. Khớp giảng viên thì trang hiện tên, giới thiệu và toàn bộ khóa của người đó.", "vi", "buyer");
         seed("buyer-message", "Nhắn giảng viên", "Trên trang giảng viên hoặc trang khóa, bấm Nhắn giảng viên. Cần đăng nhập. Khung tin nhắn mở ở góc trái.", "vi", "buyer");
         seed("buyer-favorite", "Yêu thích", "Bấm trái tim trên thẻ khóa hoặc trong trang khóa. Danh sách đã lưu nằm ở mục Yêu thích.", "vi", "buyer");
-        seed("buyer-pay", "Thanh toán", "Ở giỏ hàng chọn Thanh toán thường để ghi đơn và mở khóa ngay, hoặc MoMo để sang cổng MoMo. Thanh toán lại vẫn dùng đơn cũ.", "vi", "buyer");
+        seed("buyer-pay", "Thanh toán", "Ở giỏ hàng bấm Thanh toán MoMo để sang cổng thanh toán MoMo. Thanh toán lại vẫn dùng đơn cũ.", "vi", "buyer");
         seed("buyer-orders", "Đơn mua", "Hỏi AI Care để biết đơn gần đây, tổng tiền và mã giảm. Mục Đơn mua xem toàn bộ danh sách đơn hàng đã mua.", "vi", "buyer");
         seed("buyer-no-excel", "Quy định xuất Excel", "Học viên không có quyền xuất file Excel. Tính năng xuất báo cáo Excel chỉ dành riêng cho Giảng viên và Quản trị viên hệ thống.", "vi", "buyer");
         seed("buyer-live", "Số liệu học", "Hỏi AI Care giỏ hàng còn gì, đang học khóa nào, tiến độ, chứng chỉ. Không cần được chỉ đường nếu số liệu đã có.", "vi", "buyer");

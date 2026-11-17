@@ -1,8 +1,6 @@
-import { FormEvent, useEffect, useMemo, useState } from 'react'
-import { SEED_REVIEWS, type Offer, loadOffers, money } from '../data/courseMarket'
-import { addVoucher, adLimit, adsTaken, kycOf, ledger, registerAd, saveKycFor, saveListing, seller, vouchers } from '../lib/buyerStore'
+import { FormEvent, useEffect, useState } from 'react'
+import { addVoucher, kycOf, ledger, saveKycFor, seller, vouchers } from '../lib/buyerStore'
 import { buyersOf, openChat } from '../lib/inbox'
-import { allReviews, replyOf, setReply } from '../lib/marketStore'
 import { useAuth } from '../context/AuthContext'
 import axiosClient from '../api/axiosClient'
 
@@ -54,17 +52,10 @@ const VIETNAM_BANKS = [
 
 export default function SellPage() {
   const { user } = useAuth()
-  const [offers, setOffers] = useState<Offer[]>([])
   const [profile, setProfile] = useState(() => (user?.id ? kycOf(user.id) : kycOf(0)))
-  const [slug, setSlug] = useState('')
-  const [title, setTitle] = useState('')
-  const [price, setPrice] = useState('')
-  const [description, setDescription] = useState('')
   const [code, setCode] = useState('SHOP15')
   const [percent, setPercent] = useState('15')
   const [max, setMax] = useState('20')
-  const [replyId, setReplyId] = useState('')
-  const [reply, setReplyText] = useState('')
   const [tick, setTick] = useState(0)
   const [msg, setMsg] = useState<string | null>(null)
   const [kycEdit, setKycEdit] = useState(false)
@@ -110,36 +101,6 @@ export default function SellPage() {
     return () => { cancelled = true }
   }, [user?.id, user?.username])
 
-  useEffect(() => {
-    loadOffers().then((rows) => {
-      setOffers(rows)
-      const first = rows[0]
-      if (first) {
-        setSlug(first.slug)
-        setTitle(first.title)
-        setPrice(String(first.price))
-        setDescription(first.description)
-      }
-    })
-  }, [])
-
-  const current = offers.find((item) => item.slug === slug)
-  const suggestion = useMemo(() => {
-    if (!current) return 0
-    const peers = offers.filter((item) => item.category === current.category)
-    if (!peers.length) return current.price
-    return Math.round(peers.reduce((sum, item) => sum + item.price, 0) / peers.length)
-  }, [offers, current])
-
-  const pick = (next: string) => {
-    const row = offers.find((item) => item.slug === next)
-    setSlug(next)
-    if (!row) return
-    setTitle(row.title)
-    setPrice(String(row.price))
-    setDescription(row.description)
-  }
-
   const saveKyc = (e: FormEvent) => {
     e.preventDefault()
     if (profile.kyc === 'verified') return
@@ -167,22 +128,8 @@ export default function SellPage() {
       .catch(() => setMsg('Không gửi được hồ sơ. Hãy chạy identity-service rồi gửi lại.'))
   }
 
-  const saveTin = (e: FormEvent) => {
-    e.preventDefault()
-    if (!slug) return
-    saveListing(slug, { title, price: Number(price) || 0, description })
-    setMsg('Đã sửa tin. Giá gợi ý lấy trung bình các khóa cùng danh mục.')
-    loadOffers().then(setOffers)
-  }
-
   const books = ledger()
-  const taken = adsTaken()
-  const slots = adLimit()
   void tick
-  const reviewRows = [
-    ...SEED_REVIEWS.map((row) => ({ ...row, reply: replyOf(row.id, row.reply) })),
-    ...allReviews().map((row) => ({ ...row, reply: replyOf(row.id, row.reply) })),
-  ]
 
   const exportCsv = () => {
     const lines = ['don,khoa,tong,phi_san,thuc_nhan', ...books.released.map((row) => {
@@ -260,35 +207,6 @@ export default function SellPage() {
         </div>
       </form>
 
-      <form className="learner-panel" onSubmit={saveTin}>
-        <h2>Đăng tin, sửa tin, gợi ý giá</h2>
-        <p className="muted">Tạo khóa mới vẫn ở Studio. Ở đây sửa tin đang bán trên chợ.</p>
-        <select value={slug} onChange={(e) => pick(e.target.value)}>
-          {offers.map((item) => <option key={item.slug} value={item.slug}>{item.title}</option>)}
-        </select>
-        <input value={title} onChange={(e) => setTitle(e.target.value)} placeholder="Tên khóa" />
-        <input value={price} onChange={(e) => setPrice(e.target.value)} placeholder="Giá" />
-        <p className="muted">Gợi ý giá cùng danh mục: {money(suggestion)}</p>
-        <textarea value={description} onChange={(e) => setDescription(e.target.value)} rows={3} />
-        <button type="submit">Lưu tin</button>
-      </form>
-
-      <section className="learner-panel">
-        <h2>Gói quảng cáo</h2>
-        <p>Đã đăng ký {taken}/{slots} suất. Gói làm khóa hiện ở mục Quảng cáo trên trang chủ.</p>
-        <button
-          type="button"
-          disabled={taken >= slots || profile.kyc !== 'verified'}
-          onClick={() => {
-            if (registerAd()) setMsg('Đã đăng ký một suất quảng cáo.')
-            setTick((n) => n + 1)
-          }}
-        >
-          {taken >= slots ? 'Hết suất' : 'Đăng ký gói'}
-        </button>
-        {profile.kyc !== 'verified' && <p className="muted">Cần xác minh danh tính trước khi đăng ký gói.</p>}
-      </section>
-
       <form className="learner-panel" onSubmit={(e) => {
         e.preventDefault()
         addVoucher(code, Number(percent) || 0, Number(max) || 1)
@@ -305,26 +223,6 @@ export default function SellPage() {
         {vouchers().map((item) => (
           <p key={item.id}>{item.code} · {item.percent}% · {item.used}/{item.max} lượt</p>
         ))}
-      </form>
-
-      <form className="learner-panel" onSubmit={(e) => {
-        e.preventDefault()
-        if (!replyId) return
-        setReply(replyId, reply)
-        setTick((n) => n + 1)
-        setMsg('Đã trả lời đánh giá.')
-      }}>
-        <h2>Trả lời đánh giá</h2>
-        <select value={replyId} onChange={(e) => {
-          setReplyId(e.target.value)
-          const row = reviewRows.find((item) => item.id === e.target.value)
-          setReplyText(row?.reply || '')
-        }}>
-          <option value="">Chọn đánh giá</option>
-          {reviewRows.map((item) => <option key={item.id} value={item.id}>{item.author}: {item.text}</option>)}
-        </select>
-        <textarea value={reply} onChange={(e) => setReplyText(e.target.value)} rows={3} placeholder="Câu trả lời của shop" />
-        <button type="submit">Gửi trả lời</button>
       </form>
 
       <section className="learner-panel">

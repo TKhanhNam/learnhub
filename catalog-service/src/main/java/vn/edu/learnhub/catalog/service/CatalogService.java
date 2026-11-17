@@ -181,7 +181,7 @@ public class CatalogService {
         String safeKeyword = keyword == null ? "" : keyword.trim();
         boolean all = status == null || status.isBlank() || "ALL".equalsIgnoreCase(status);
         if (all && safeKeyword.isEmpty()) {
-            return courseRepository.findAll(pageable).map(this::toSummary);
+            return courseRepository.findAllOrderById(pageable).map(this::toSummary);
         }
         if (all) {
             return courseRepository.findByTitleContainingIgnoreCase(safeKeyword, pageable).map(this::toSummary);
@@ -312,8 +312,9 @@ public class CatalogService {
                 }
             }
             case "REJECT" -> course.setStatus(Course.STATUS_REJECTED);
+            case "PENDING", "SUBMIT" -> course.setStatus(Course.STATUS_PENDING);
             case "UNPUBLISH" -> course.setStatus(Course.STATUS_DRAFT);
-            default -> throw BusinessException.badRequest("Hanh dong chi duoc la APPROVE, REJECT hoac UNPUBLISH");
+            default -> throw BusinessException.badRequest("Hanh dong chi duoc la APPROVE, REJECT, PENDING hoac UNPUBLISH");
         }
 
         courseRepository.save(course);

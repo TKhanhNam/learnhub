@@ -70,7 +70,7 @@ export default function App() {
           <Route path="/favorites" element={<FavoritesPage />} />
           <Route path="/orders" element={<ProtectedRoute requireVerified><OrdersPage /></ProtectedRoute>} />
           <Route path="/payment/result" element={<PaymentResultPage />} />
-          <Route path="/sell" element={<SellPage />} />
+          <Route path="/sell" element={<ProtectedRoute roles={['INSTRUCTOR', 'ADMIN', 'ORG_ADMIN']}><SellPage /></ProtectedRoute>} />
           <Route path="/market" element={<Navigate to="/courses" replace />} />
           <Route path="/messages" element={<Navigate to="/" replace />} />
           <Route path="/forgot-password" element={<ForgotPasswordPage />} />
